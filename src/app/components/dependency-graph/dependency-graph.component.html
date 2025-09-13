@@ -2,8 +2,7 @@
   <!-- Header -->
   <div class="graph-header">
     <div class="header-content">
-      <h1>Dependency Graph Visualization</h1>
-      <p>Interactive visualization of service dependencies and relationships</p>
+      <h4>Dependency graph</h4>
     </div>
     <div class="header-actions">
       <button class="btn-primary" (click)="exportGraph()">
@@ -39,32 +38,7 @@
       >
     </div>
 
-    <div class="control-group">
-      <label>Service Types:</label>
-      <select multiple [(ngModel)]="filterByType" (change)="applyFilters()" class="control-multi-select">
-        <option *ngFor="let type of getServiceTypeOptions()" [value]="type">
-          {{ getServiceTypeLabel(type) }}
-        </option>
-      </select>
-    </div>
-
-    <div class="control-group">
-      <label>Status:</label>
-      <select multiple [(ngModel)]="filterByStatus" (change)="applyFilters()" class="control-multi-select">
-        <option *ngFor="let status of getStatusOptions()" [value]="status">
-          {{ getStatusLabel(status) }}
-        </option>
-      </select>
-    </div>
-
-    <div class="control-group">
-      <label>Criticality:</label>
-      <select multiple [(ngModel)]="filterByCriticality" (change)="applyFilters()" class="control-multi-select">
-        <option *ngFor="let criticality of getCriticalityOptions()" [value]="criticality">
-          {{ getCriticalityLabel(criticality) }}
-        </option>
-      </select>
-    </div>
+    
 
     <div class="control-group">
       <label class="checkbox-label">
