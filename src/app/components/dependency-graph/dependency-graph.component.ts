@@ -2,22 +2,22 @@ import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } fr
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
-import * as cytoscape from 'cytoscape';
+import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import cola from 'cytoscape-cola';
 import coseBilkent from 'cytoscape-cose-bilkent';
 import avsdf from 'cytoscape-avsdf';
 import klay from 'cytoscape-klay';
 import { DependencyService } from '../../services/dependency.service';
-import { Service, Dependency, ServiceType, ServiceStatus, CriticalityLevel, GraphLayout } from '../../models/service.model';
+import { Service, Dependency, ServiceType, ServiceStatus, CriticalityLevel, DependencyType, GraphLayout } from '../../models/service.model';
 
 interface CytoscapeNode {
   data: {
     id: string;
     name: string;
-    type: string;
-    status: string;
-    criticality: string;
+    type: ServiceType;
+    status: ServiceStatus;
+    criticality: CriticalityLevel;
     team?: string;
     environment: string;
     uptime?: number;
@@ -27,7 +27,7 @@ interface CytoscapeNode {
     weight?: number;
   };
   position?: { x: number; y: number };
-  classes?: string;
+  classes?: string[];
 }
 
 interface CytoscapeEdge {
@@ -35,7 +35,7 @@ interface CytoscapeEdge {
     id: string;
     source: string;
     target: string;
-    type: string;
+    type: DependencyType;
     usageCount: number;
     isActive: boolean;
     weight: number;
@@ -45,7 +45,7 @@ interface CytoscapeEdge {
     latency?: number;
     errorRate?: number;
   };
-  classes?: string;
+  classes?: string[];
 }
 
 @Component({

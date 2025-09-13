@@ -39,7 +39,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   activeServices = 0;
   totalDependencies = 0;
   criticalDependencies = 0;
-  uniqueTeams = 0;
+  uniqueTeams: string[] = [];
   environments: string[] = [];
   unreadAlerts = 0;
   serviceTypeCounts: { [key: string]: number } = {};
@@ -93,8 +93,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.criticalDependencies = this.dependencies.filter(d => d.isCritical).length;
     
     // Count unique teams and environments
-    const teams = new Set(this.services.map(s => s.team).filter(Boolean));
-    this.uniqueTeams = teams.size;
+    const teams = new Set(this.services.map(s => s.team).filter((team): team is string => Boolean(team)));
+    this.uniqueTeams = Array.from(teams);
     
     const envs = new Set(this.services.map(s => s.environment));
     this.environments = Array.from(envs);
@@ -118,7 +118,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.applyFilters();
   }
 
-  private applyFilters(): void {
+  applyFilters(): void {
     let filtered = [...this.services];
 
     // Apply search filter
