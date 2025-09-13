@@ -163,8 +163,14 @@ export class DependencyService {
         port: 8080,
         environment: 'production',
         team: 'Platform Team',
+        owner: 'John Doe',
+        version: '2.1.0',
         lastSeen: new Date(),
         status: 'ACTIVE' as any,
+        criticality: 'HIGH' as any,
+        uptime: 99.9,
+        responseTime: 120,
+        errorRate: 0.1,
         tags: ['authentication', 'user-management'],
         metadata: { version: '2.1.0', framework: 'Spring Boot' }
       },
@@ -177,8 +183,14 @@ export class DependencyService {
         port: 5000,
         environment: 'production',
         team: 'E-commerce Team',
+        owner: 'Jane Smith',
+        version: '1.5.2',
         lastSeen: new Date(),
         status: 'ACTIVE' as any,
+        criticality: 'CRITICAL' as any,
+        uptime: 99.95,
+        responseTime: 85,
+        errorRate: 0.05,
         tags: ['orders', 'e-commerce'],
         metadata: { version: '1.5.2', framework: '.NET Core' }
       },
@@ -190,8 +202,14 @@ export class DependencyService {
         url: 'https://api.stripe.com',
         environment: 'production',
         team: 'External',
+        owner: 'Stripe Inc.',
+        version: '2020-08-27',
         lastSeen: new Date(),
         status: 'ACTIVE' as any,
+        criticality: 'CRITICAL' as any,
+        uptime: 99.99,
+        responseTime: 200,
+        errorRate: 0.01,
         tags: ['payment', 'external'],
         metadata: { provider: 'Stripe', version: '2020-08-27' }
       },
@@ -204,8 +222,14 @@ export class DependencyService {
         port: 5432,
         environment: 'production',
         team: 'Platform Team',
+        owner: 'Database Team',
+        version: '13.4',
         lastSeen: new Date(),
         status: 'ACTIVE' as any,
+        criticality: 'HIGH' as any,
+        uptime: 99.8,
+        responseTime: 5,
+        errorRate: 0.02,
         tags: ['database', 'postgresql'],
         metadata: { engine: 'PostgreSQL', version: '13.4' }
       }
@@ -221,6 +245,12 @@ export class DependencyService {
         lastUsed: new Date(),
         description: 'Order service calls user service for customer validation',
         isActive: true,
+        weight: 8,
+        frequency: 'HIGH' as any,
+        isCritical: true,
+        failureImpact: 'HIGH' as any,
+        latency: 150,
+        errorRate: 0.5,
         metadata: { endpoint: '/api/users/validate', method: 'POST' }
       },
       {
@@ -232,6 +262,12 @@ export class DependencyService {
         lastUsed: new Date(),
         description: 'Order service processes payments via Stripe',
         isActive: true,
+        weight: 10,
+        frequency: 'HIGH' as any,
+        isCritical: true,
+        failureImpact: 'HIGH' as any,
+        latency: 200,
+        errorRate: 0.1,
         metadata: { endpoint: '/v1/charges', method: 'POST' }
       },
       {
@@ -243,6 +279,12 @@ export class DependencyService {
         lastUsed: new Date(),
         description: 'User service queries user database',
         isActive: true,
+        weight: 9,
+        frequency: 'HIGH' as any,
+        isCritical: true,
+        failureImpact: 'HIGH' as any,
+        latency: 5,
+        errorRate: 0.02,
         metadata: { table: 'users', operation: 'SELECT' }
       }
     ];

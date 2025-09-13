@@ -1,123 +1,300 @@
-<div class="dependency-graph-container">
+<div class="dependency-graph">
+  <!-- Header -->
   <div class="graph-header">
-    <h2>Dependency Graph</h2>
-    <div class="graph-controls">
-      <button (click)="resetZoom()" class="control-btn" title="Reset Zoom">
-        🔍
+    <div class="header-content">
+      <h1>Dependency Graph Visualization</h1>
+      <p>Interactive visualization of service dependencies and relationships</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-primary" (click)="exportGraph()">
+        <i class="icon-export">📊</i>
+        Export Graph
       </button>
-      <button (click)="centerGraph()" class="control-btn" title="Center Graph">
-        🎯
-      </button>
-      <button (click)="exportGraph()" class="control-btn" title="Export Graph">
-        💾
+      <button class="btn-secondary" (click)="exportData()">
+        <i class="icon-download">⬇️</i>
+        Export Data
       </button>
     </div>
   </div>
 
-  <div class="graph-legend">
+  <!-- Controls Panel -->
+  <div class="controls-panel">
+    <div class="control-group">
+      <label>Layout:</label>
+      <select [(ngModel)]="selectedLayout" (change)="changeLayout(selectedLayout)" class="control-select">
+        <option *ngFor="let layout of layouts" [value]="layout.name">
+          {{ layout.displayName }}
+        </option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Search:</label>
+      <input 
+        type="text" 
+        [(ngModel)]="searchQuery" 
+        (input)="applyFilters()"
+        placeholder="Search services..."
+        class="control-input"
+      >
+    </div>
+
+    <div class="control-group">
+      <label>Service Types:</label>
+      <select multiple [(ngModel)]="filterByType" (change)="applyFilters()" class="control-multi-select">
+        <option *ngFor="let type of getServiceTypeOptions()" [value]="type">
+          {{ getServiceTypeLabel(type) }}
+        </option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Status:</label>
+      <select multiple [(ngModel)]="filterByStatus" (change)="applyFilters()" class="control-multi-select">
+        <option *ngFor="let status of getStatusOptions()" [value]="status">
+          {{ getStatusLabel(status) }}
+        </option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Criticality:</label>
+      <select multiple [(ngModel)]="filterByCriticality" (change)="applyFilters()" class="control-multi-select">
+        <option *ngFor="let criticality of getCriticalityOptions()" [value]="criticality">
+          {{ getCriticalityLabel(criticality) }}
+        </option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="showLabels" (change)="toggleLabels()">
+        Show Labels
+      </label>
+    </div>
+
+    <div class="control-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="showEdgeLabels" (change)="toggleEdgeLabels()">
+        Show Edge Labels
+      </label>
+    </div>
+
+    <div class="control-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="showMetrics" (change)="toggleMetrics()">
+        Show Metrics
+      </label>
+    </div>
+
+    <div class="control-group">
+      <button class="btn-clear" (click)="clearFilters()">Clear Filters</button>
+    </div>
+  </div>
+
+  <!-- Graph Container -->
+  <div class="graph-container">
+    <div #graphContainer class="cytoscape-container"></div>
+    
+    <!-- Graph Controls Overlay -->
+    <div class="graph-controls-overlay">
+      <div class="zoom-controls">
+        <button class="control-btn" (click)="resetZoom()" title="Reset Zoom">
+          <i class="icon-reset">🔄</i>
+        </button>
+        <button class="control-btn" (click)="fitToScreen()" title="Fit to Screen">
+          <i class="icon-fit">📐</i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Panel -->
+  <div class="stats-panel">
+    <div class="stat-item">
+      <span class="stat-label">Nodes:</span>
+      <span class="stat-value">{{ totalNodes }}</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Edges:</span>
+      <span class="stat-value">{{ totalEdges }}</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Layout:</span>
+      <span class="stat-value">{{ selectedLayout }}</span>
+    </div>
+  </div>
+
+  <!-- Selection Details Panel -->
+  <div class="details-panel" *ngIf="selectedNode || selectedEdge">
+    <div class="details-header">
+      <h3>{{ selectedNode ? 'Service Details' : 'Dependency Details' }}</h3>
+      <button class="close-btn" (click)="selectedNode = null; selectedEdge = null">×</button>
+    </div>
+    
+    <div class="details-content" *ngIf="selectedNode">
+      <div class="detail-section">
+        <h4>{{ selectedNode.data('name') }}</h4>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Type:</span>
+            <span class="detail-value">{{ getServiceTypeLabel(selectedNode.data('type')) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Status:</span>
+            <span class="detail-value status-badge" [class]="selectedNode.data('status').toLowerCase()">
+              {{ getStatusLabel(selectedNode.data('status')) }}
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Criticality:</span>
+            <span class="detail-value criticality-badge" [class]="selectedNode.data('criticality').toLowerCase()">
+              {{ getCriticalityLabel(selectedNode.data('criticality')) }}
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Environment:</span>
+            <span class="detail-value">{{ selectedNode.data('environment') }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedNode.data('team')">
+            <span class="detail-label">Team:</span>
+            <span class="detail-value">{{ selectedNode.data('team') }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Dependencies:</span>
+            <span class="detail-value">{{ selectedNode.data('dependencies') }}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="detail-section" *ngIf="showMetrics">
+        <h4>Metrics</h4>
+        <div class="metrics-grid">
+          <div class="metric-item" *ngIf="selectedNode.data('uptime')">
+            <span class="metric-label">Uptime:</span>
+            <span class="metric-value">{{ selectedNode.data('uptime') }}%</span>
+          </div>
+          <div class="metric-item" *ngIf="selectedNode.data('responseTime')">
+            <span class="metric-label">Response Time:</span>
+            <span class="metric-value">{{ selectedNode.data('responseTime') }}ms</span>
+          </div>
+          <div class="metric-item" *ngIf="selectedNode.data('errorRate')">
+            <span class="metric-label">Error Rate:</span>
+            <span class="metric-value">{{ selectedNode.data('errorRate') }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="details-content" *ngIf="selectedEdge">
+      <div class="detail-section">
+        <h4>{{ getDependencyTypeLabel(selectedEdge.data('type')) }}</h4>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Source:</span>
+            <span class="detail-value">{{ selectedEdge.source().data('name') }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Target:</span>
+            <span class="detail-value">{{ selectedEdge.target().data('name') }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Usage Count:</span>
+            <span class="detail-value">{{ selectedEdge.data('usageCount') }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Weight:</span>
+            <span class="detail-value">{{ selectedEdge.data('weight') }}/10</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Frequency:</span>
+            <span class="detail-value">{{ selectedEdge.data('frequency') }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Critical:</span>
+            <span class="detail-value">{{ selectedEdge.data('isCritical') ? 'Yes' : 'No' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Active:</span>
+            <span class="detail-value">{{ selectedEdge.data('isActive') ? 'Yes' : 'No' }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedEdge.data('latency')">
+            <span class="detail-label">Latency:</span>
+            <span class="detail-value">{{ selectedEdge.data('latency') }}ms</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedEdge.data('errorRate')">
+            <span class="detail-label">Error Rate:</span>
+            <span class="detail-value">{{ selectedEdge.data('errorRate') }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend-panel">
+    <h4>Legend</h4>
+    
     <div class="legend-section">
-      <h4>Service Types</h4>
+      <h5>Node Colors (Status)</h5>
       <div class="legend-items">
         <div class="legend-item">
-          <span class="legend-icon">☕</span>
-          <span>Java App</span>
+          <div class="legend-color" style="background-color: #10b981;"></div>
+          <span>Active</span>
         </div>
         <div class="legend-item">
-          <span class="legend-icon">🔷</span>
-          <span>.NET App</span>
+          <div class="legend-color" style="background-color: #ef4444;"></div>
+          <span>Inactive/Error</span>
         </div>
         <div class="legend-item">
-          <span class="legend-icon">🅰️</span>
-          <span>Angular App</span>
+          <div class="legend-color" style="background-color: #f59e0b;"></div>
+          <span>Deprecated</span>
         </div>
         <div class="legend-item">
-          <span class="legend-icon">🗄️</span>
-          <span>Database</span>
+          <div class="legend-color" style="background-color: #3b82f6;"></div>
+          <span>Maintenance</span>
         </div>
         <div class="legend-item">
-          <span class="legend-icon">🔌</span>
-          <span>API</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-icon">📨</span>
-          <span>Queue</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-icon">🌐</span>
-          <span>External</span>
+          <div class="legend-color" style="background-color: #6b7280;"></div>
+          <span>Unknown</span>
         </div>
       </div>
     </div>
 
     <div class="legend-section">
-      <h4>Dependency Types</h4>
+      <h5>Edge Colors (Type)</h5>
       <div class="legend-items">
         <div class="legend-item">
-          <div class="legend-line" style="background-color: #667eea;"></div>
+          <div class="legend-color" style="background-color: #667eea;"></div>
           <span>HTTP Request</span>
         </div>
         <div class="legend-item">
-          <div class="legend-line" style="background-color: #48bb78;"></div>
+          <div class="legend-color" style="background-color: #10b981;"></div>
           <span>Database Query</span>
         </div>
         <div class="legend-item">
-          <div class="legend-line" style="background-color: #ed8936;"></div>
+          <div class="legend-color" style="background-color: #f59e0b;"></div>
           <span>Message Queue</span>
         </div>
         <div class="legend-item">
-          <div class="legend-line" style="background-color: #9f7aea;"></div>
-          <span>File System</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-line" style="background-color: #f56565;"></div>
+          <div class="legend-color" style="background-color: #ef4444;"></div>
           <span>API Call</span>
         </div>
         <div class="legend-item">
-          <div class="legend-line" style="background-color: #4299e1;"></div>
+          <div class="legend-color" style="background-color: #3b82f6;"></div>
           <span>Direct Dependency</span>
         </div>
       </div>
     </div>
 
     <div class="legend-section">
-      <h4>Status</h4>
-      <div class="legend-items">
-        <div class="legend-item">
-          <div class="legend-status" style="background-color: #48bb78;"></div>
-          <span>Active</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-status" style="background-color: #f56565;"></div>
-          <span>Inactive</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-status" style="background-color: #ed8936;"></div>
-          <span>Deprecated</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-status" style="background-color: #a0aec0;"></div>
-          <span>Unknown</span>
-        </div>
-      </div>
+      <h5>Node Size</h5>
+      <p>Larger nodes have more dependencies</p>
     </div>
-  </div>
 
-  <div class="graph-wrapper">
-    <div #graphContainer class="graph-container"></div>
-  </div>
-
-  <div class="graph-info">
-    <div class="info-item">
-      <span class="info-label">Nodes:</span>
-      <span class="info-value">{{ nodes.length }}</span>
-    </div>
-    <div class="info-item">
-      <span class="info-label">Connections:</span>
-      <span class="info-value">{{ links.length }}</span>
-    </div>
-    <div class="info-item">
-      <span class="info-label">Instructions:</span>
-      <span class="info-value">Drag nodes to move them, scroll to zoom</span>
+    <div class="legend-section">
+      <h5>Edge Width</h5>
+      <p>Thicker edges indicate higher usage</p>
     </div>
   </div>
 </div>

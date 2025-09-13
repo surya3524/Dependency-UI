@@ -1,184 +1,375 @@
-<div class="dashboard-container">
+<div class="dashboard">
   <!-- Header -->
-  <header class="dashboard-header">
+  <div class="dashboard-header">
     <div class="header-content">
       <h1>System Dependency Mapping Tool</h1>
-      <p>Visualize and manage dependencies between your IT systems</p>
+      <p class="subtitle">Comprehensive view of your IT infrastructure dependencies</p>
     </div>
-  </header>
+    <div class="header-actions">
+      <button class="btn-primary" [routerLink]="['/service/new']">
+        <i class="icon-plus">+</i>
+        Add Service
+      </button>
+      <button class="btn-secondary" [routerLink]="['/graph']">
+        <i class="icon-graph">📊</i>
+        View Graph
+      </button>
+    </div>
+  </div>
 
-  <!-- Statistics Cards -->
-  <section class="stats-section">
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-content">
-          <h3>{{ totalServices }}</h3>
-          <p>Total Services</p>
-        </div>
+  <!-- Statistics Overview -->
+  <div class="stats-overview">
+    <div class="stat-card primary">
+      <div class="stat-icon">
+        <i class="icon-services">📊</i>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon">✅</div>
-        <div class="stat-content">
-          <h3>{{ activeServices }}</h3>
-          <p>Active Services</p>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🔗</div>
-        <div class="stat-content">
-          <h3>{{ totalDependencies }}</h3>
-          <p>Dependencies</p>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📈</div>
-        <div class="stat-content">
-          <h3>{{ (activeServices / totalServices * 100).toFixed(1) }}%</h3>
-          <p>Health Score</p>
-        </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ totalServices }}</div>
+        <div class="stat-label">Total Services</div>
+        <div class="stat-change positive">+{{ activeServices }} active</div>
       </div>
     </div>
-  </section>
+    
+    <div class="stat-card success">
+      <div class="stat-icon">
+        <i class="icon-check">✅</i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ activeServices }}</div>
+        <div class="stat-label">Active Services</div>
+        <div class="stat-change">{{ (activeServices / totalServices * 100).toFixed(1) }}% of total</div>
+      </div>
+    </div>
+    
+    <div class="stat-card warning">
+      <div class="stat-icon">
+        <i class="icon-connections">🔗</i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ totalDependencies }}</div>
+        <div class="stat-label">Dependencies</div>
+        <div class="stat-change">{{ criticalDependencies }} critical</div>
+      </div>
+    </div>
+    
+    <div class="stat-card info">
+      <div class="stat-icon">
+        <i class="icon-teams">👥</i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ uniqueTeams }}</div>
+        <div class="stat-label">Teams</div>
+        <div class="stat-change">{{ environments.length }} environments</div>
+      </div>
+    </div>
+  </div>
 
-  <!-- Filters and Search -->
-  <section class="filters-section">
-    <div class="filters-container">
-      <div class="search-box">
+  <!-- Quick Actions -->
+  <div class="quick-actions">
+    <h3>Quick Actions</h3>
+    <div class="action-buttons">
+      <button class="action-btn" (click)="exportData()">
+        <i class="icon-download">⬇️</i>
+        Export Data
+      </button>
+      <button class="action-btn" (click)="importData()">
+        <i class="icon-upload">⬆️</i>
+        Import Data
+      </button>
+      <button class="action-btn" (click)="refreshData()">
+        <i class="icon-refresh">🔄</i>
+        Refresh
+      </button>
+      <button class="action-btn" (click)="showAlerts()">
+        <i class="icon-alert">🚨</i>
+        View Alerts
+        <span class="badge" *ngIf="unreadAlerts > 0">{{ unreadAlerts }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Advanced Filters -->
+  <div class="filters-section">
+    <div class="filters-header">
+      <h3>Filters & Search</h3>
+      <button class="btn-link" (click)="toggleAdvancedFilters()">
+        {{ showAdvancedFilters ? 'Hide' : 'Show' }} Advanced Filters
+      </button>
+    </div>
+    
+    <div class="filters-content">
+      <div class="search-bar">
+        <i class="icon-search">🔍</i>
         <input 
           type="text" 
           [(ngModel)]="searchQuery" 
           (input)="onSearchChange()"
-          placeholder="Search services..."
+          placeholder="Search services, teams, tags, or descriptions..."
           class="search-input"
         >
-        <span class="search-icon">🔍</span>
       </div>
       
-      <div class="filter-controls">
-        <select 
-          [(ngModel)]="selectedServiceType" 
-          (change)="onServiceTypeChange()"
-          class="filter-select"
-        >
-          <option value="">All Types</option>
-          <option *ngFor="let type of getServiceTypeOptions()" [value]="type">
-            {{ getServiceTypeLabel(type) }}
-          </option>
-        </select>
-
-        <select 
-          [(ngModel)]="selectedStatus" 
-          (change)="onStatusChange()"
-          class="filter-select"
-        >
-          <option value="">All Status</option>
-          <option *ngFor="let status of getStatusOptions()" [value]="status">
-            {{ getStatusLabel(status) }}
-          </option>
-        </select>
-
-        <button (click)="clearFilters()" class="clear-filters-btn">
-          Clear Filters
-        </button>
+      <div class="filter-chips" *ngIf="activeFilters.length > 0">
+        <div *ngFor="let filter of activeFilters" class="filter-chip">
+          <span>{{ filter.label }}: {{ filter.value }}</span>
+          <button (click)="removeFilter(filter)" class="chip-remove">×</button>
+        </div>
+        <button class="clear-all" (click)="clearAllFilters()">Clear All</button>
+      </div>
+      
+      <div class="advanced-filters" *ngIf="showAdvancedFilters">
+        <div class="filter-row">
+          <div class="filter-group">
+            <label>Service Types</label>
+            <div class="checkbox-group">
+              <label *ngFor="let type of getServiceTypeOptions()" class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  [value]="type"
+                  [checked]="selectedServiceTypes.includes(type)"
+                  (change)="onServiceTypeFilterChange(type, $event)"
+                >
+                <span>{{ getServiceTypeLabel(type) }}</span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="filter-group">
+            <label>Status</label>
+            <div class="checkbox-group">
+              <label *ngFor="let status of getStatusOptions()" class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  [value]="status"
+                  [checked]="selectedStatuses.includes(status)"
+                  (change)="onStatusFilterChange(status, $event)"
+                >
+                <span>{{ getStatusLabel(status) }}</span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="filter-group">
+            <label>Criticality</label>
+            <div class="checkbox-group">
+              <label *ngFor="let level of getCriticalityLevels()" class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  [value]="level"
+                  [checked]="selectedCriticalityLevels.includes(level)"
+                  (change)="onCriticalityFilterChange(level, $event)"
+                >
+                <span>{{ getCriticalityLabel(level) }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        <div class="filter-row">
+          <div class="filter-group">
+            <label>Teams</label>
+            <select multiple [(ngModel)]="selectedTeams" (change)="applyFilters()" class="multi-select">
+              <option *ngFor="let team of uniqueTeams" [value]="team">{{ team }}</option>
+            </select>
+          </div>
+          
+          <div class="filter-group">
+            <label>Environments</label>
+            <select multiple [(ngModel)]="selectedEnvironments" (change)="applyFilters()" class="multi-select">
+              <option *ngFor="let env of environments" [value]="env">{{ env }}</option>
+            </select>
+          </div>
+          
+          <div class="filter-group">
+            <label>Date Range</label>
+            <div class="date-range">
+              <input type="date" [(ngModel)]="dateRange.start" (change)="applyFilters()">
+              <span>to</span>
+              <input type="date" [(ngModel)]="dateRange.end" (change)="applyFilters()">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </section>
+  </div>
 
   <!-- Service Type Distribution -->
-  <section class="distribution-section">
-    <h2>Service Distribution</h2>
-    <div class="distribution-grid">
-      <div 
-        *ngFor="let type of getServiceTypeOptions()" 
-        class="distribution-item"
-        [class.active]="selectedServiceType === type"
-        (click)="selectedServiceType = type; onServiceTypeChange()"
-      >
-        <span class="type-icon">{{ getServiceTypeIcon(type) }}</span>
-        <span class="type-label">{{ getServiceTypeLabel(type) }}</span>
-        <span class="type-count">{{ serviceTypeCounts[type] || 0 }}</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- Services List -->
-  <section class="services-section">
-    <div class="section-header">
-      <h2>Services ({{ filteredServices.length }})</h2>
-      <button class="add-service-btn" routerLink="/services/add">
-        + Add Service
-      </button>
-    </div>
-
-    <div class="services-grid">
-      <div 
-        *ngFor="let service of filteredServices" 
-        class="service-card"
-        [routerLink]="['/services', service.id]"
-      >
-        <div class="service-header">
-          <div class="service-icon">{{ getServiceTypeIcon(service.type) }}</div>
-          <div class="service-info">
-            <h3>{{ service.name }}</h3>
-            <p class="service-description">{{ service.description }}</p>
+  <div class="chart-section">
+    <h3>Service Distribution</h3>
+    <div class="chart-container">
+      <div class="service-type-chart">
+        <div *ngFor="let type of getServiceTypeDistribution()" class="type-bar">
+          <div class="type-info">
+            <span class="type-icon">{{ getServiceTypeIcon(type.type) }}</span>
+            <span class="type-name">{{ getServiceTypeLabel(type.type) }}</span>
+            <span class="type-count">{{ type.count }}</span>
           </div>
-          <div class="service-status">
-            <span 
-              class="status-badge" 
-              [style.background-color]="getStatusColor(service.status)"
-            >
-              {{ getStatusLabel(service.status) }}
-            </span>
+          <div class="type-progress">
+            <div class="progress-bar" [style.width.%]="(type.count / totalServices * 100)"></div>
           </div>
-        </div>
-
-        <div class="service-details">
-          <div class="detail-item">
-            <span class="detail-label">Type:</span>
-            <span class="detail-value">{{ getServiceTypeLabel(service.type) }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Environment:</span>
-            <span class="detail-value">{{ service.environment }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Team:</span>
-            <span class="detail-value">{{ service.team || 'Unknown' }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Last Seen:</span>
-            <span class="detail-value">{{ service.lastSeen | date:'short' }}</span>
-          </div>
-        </div>
-
-        <div class="service-dependencies">
-          <div class="dependencies-count">
-            <span class="dependencies-icon">🔗</span>
-            <span>{{ getDependenciesForService(service.id).length }} dependencies</span>
-          </div>
-        </div>
-
-        <div class="service-tags">
-          <span 
-            *ngFor="let tag of service.tags" 
-            class="service-tag"
-          >
-            {{ tag }}
-          </span>
         </div>
       </div>
     </div>
+  </div>
 
-    <div *ngIf="filteredServices.length === 0" class="no-services">
-      <div class="no-services-content">
-        <span class="no-services-icon">🔍</span>
-        <h3>No services found</h3>
-        <p>Try adjusting your search criteria or add a new service</p>
-        <button class="add-service-btn" routerLink="/services/add">
-          + Add Your First Service
+  <!-- Services Grid -->
+  <div class="services-section">
+    <div class="services-header">
+      <h3>Services ({{ filteredServices.length }})</h3>
+      <div class="view-controls">
+        <button 
+          class="view-btn" 
+          [class.active]="viewMode === 'grid'"
+          (click)="setViewMode('grid')"
+        >
+          <i class="icon-grid">⊞</i>
+        </button>
+        <button 
+          class="view-btn" 
+          [class.active]="viewMode === 'list'"
+          (click)="setViewMode('list')"
+        >
+          <i class="icon-list">☰</i>
+        </button>
+        <button 
+          class="view-btn" 
+          [class.active]="viewMode === 'table'"
+          (click)="setViewMode('table')"
+        >
+          <i class="icon-table">⊞</i>
         </button>
       </div>
     </div>
-  </section>
+    
+    <!-- Grid View -->
+    <div class="services-grid" *ngIf="viewMode === 'grid'">
+      <div *ngFor="let service of filteredServices" class="service-card" [class]="getServiceCardClass(service)">
+        <div class="service-header">
+          <div class="service-icon-container">
+            <span class="service-icon">{{ getServiceTypeIcon(service.type) }}</span>
+            <div class="status-indicator" [class]="service.status.toLowerCase()"></div>
+          </div>
+          <div class="service-title">
+            <h4>{{ service.name }}</h4>
+            <span class="service-type">{{ getServiceTypeLabel(service.type) }}</span>
+          </div>
+          <div class="service-actions">
+            <button class="action-icon" [routerLink]="['/service', service.id, 'edit']" title="Edit">
+              <i class="icon-edit">✏️</i>
+            </button>
+            <button class="action-icon" [routerLink]="['/graph']" [queryParams]="{focus: service.id}" title="View in Graph">
+              <i class="icon-graph">📊</i>
+            </button>
+            <button class="action-icon" (click)="showServiceDetails(service)" title="Details">
+              <i class="icon-info">ℹ️</i>
+            </button>
+          </div>
+        </div>
+        
+        <div class="service-content">
+          <p class="service-description" *ngIf="service.description">{{ service.description }}</p>
+          
+          <div class="service-metrics">
+            <div class="metric">
+              <span class="metric-label">Uptime</span>
+              <span class="metric-value">{{ service.uptime || 0 }}%</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Response Time</span>
+              <span class="metric-value">{{ service.responseTime || 0 }}ms</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Error Rate</span>
+              <span class="metric-value">{{ service.errorRate || 0 }}%</span>
+            </div>
+          </div>
+          
+          <div class="service-meta">
+            <div class="meta-item">
+              <i class="icon-environment">🌍</i>
+              <span>{{ service.environment }}</span>
+            </div>
+            <div class="meta-item" *ngIf="service.team">
+              <i class="icon-team">👥</i>
+              <span>{{ service.team }}</span>
+            </div>
+            <div class="meta-item" *ngIf="service.owner">
+              <i class="icon-user">👤</i>
+              <span>{{ service.owner }}</span>
+            </div>
+            <div class="meta-item">
+              <i class="icon-criticality">⚡</i>
+              <span class="criticality-badge" [class]="service.criticality.toLowerCase()">
+                {{ getCriticalityLabel(service.criticality) }}
+              </span>
+            </div>
+          </div>
+          
+          <div class="service-tags" *ngIf="service.tags.length > 0">
+            <span *ngFor="let tag of service.tags" class="tag">{{ tag }}</span>
+          </div>
+        </div>
+        
+        <div class="service-dependencies" *ngIf="getDependenciesForService(service.id).length > 0">
+          <div class="dependencies-header">
+            <span class="dependencies-count">{{ getDependenciesForService(service.id).length }} dependencies</span>
+            <button class="btn-link" (click)="toggleDependencies(service.id)">
+              {{ expandedServices.has(service.id) ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+          <div class="dependencies-list" *ngIf="expandedServices.has(service.id)">
+            <div *ngFor="let dep of getDependenciesForService(service.id)" class="dependency-item">
+              <div class="dependency-info">
+                <span class="dependency-type">{{ getDependencyTypeLabel(dep.dependencyType) }}</span>
+                <span class="dependency-target">{{ getServiceById(dep.targetServiceId)?.name || dep.targetServiceId }}</span>
+              </div>
+              <div class="dependency-metrics">
+                <span class="usage-count">{{ dep.usageCount }} calls</span>
+                <span class="dependency-weight" [class]="getWeightClass(dep.weight)">{{ dep.weight }}/10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- List View -->
+    <div class="services-list" *ngIf="viewMode === 'list'">
+      <div class="list-header">
+        <div class="list-cell">Service</div>
+        <div class="list-cell">Type</div>
+        <div class="list-cell">Status</div>
+        <div class="list-cell">Team</div>
+        <div class="list-cell">Environment</div>
+        <div class="list-cell">Dependencies</div>
+        <div class="list-cell">Actions</div>
+      </div>
+      <div *ngFor="let service of filteredServices" class="list-row">
+        <div class="list-cell">
+          <div class="service-info">
+            <span class="service-icon">{{ getServiceTypeIcon(service.type) }}</span>
+            <div>
+              <div class="service-name">{{ service.name }}</div>
+              <div class="service-description" *ngIf="service.description">{{ service.description }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="list-cell">{{ getServiceTypeLabel(service.type) }}</div>
+        <div class="list-cell">
+          <span class="status-badge" [class]="service.status.toLowerCase()">
+            {{ getStatusLabel(service.status) }}
+          </span>
+        </div>
+        <div class="list-cell">{{ service.team || '-' }}</div>
+        <div class="list-cell">{{ service.environment }}</div>
+        <div class="list-cell">{{ getDependenciesForService(service.id).length }}</div>
+        <div class="list-cell">
+          <div class="action-buttons">
+            <button class="btn-sm" [routerLink]="['/service', service.id, 'edit']">Edit</button>
+            <button class="btn-sm" [routerLink]="['/graph']" [queryParams]="{focus: service.id}">Graph</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

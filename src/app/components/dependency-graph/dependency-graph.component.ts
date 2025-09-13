@@ -1,33 +1,57 @@
 import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
-import * as d3 from 'd3';
+import * as cytoscape from 'cytoscape';
+import dagre from 'cytoscape-dagre';
+import cola from 'cytoscape-cola';
+import coseBilkent from 'cytoscape-cose-bilkent';
+import avsdf from 'cytoscape-avsdf';
+import klay from 'cytoscape-klay';
 import { DependencyService } from '../../services/dependency.service';
-import { Service, Dependency } from '../../models/service.model';
+import { Service, Dependency, ServiceType, ServiceStatus, CriticalityLevel, GraphLayout } from '../../models/service.model';
 
-interface GraphNode {
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-  x?: number;
-  y?: number;
-  fx?: number | null;
-  fy?: number | null;
+interface CytoscapeNode {
+  data: {
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+    criticality: string;
+    team?: string;
+    environment: string;
+    uptime?: number;
+    responseTime?: number;
+    errorRate?: number;
+    dependencies?: number;
+    weight?: number;
+  };
+  position?: { x: number; y: number };
+  classes?: string;
 }
 
-interface GraphLink {
-  source: string | GraphNode;
-  target: string | GraphNode;
-  type: string;
-  usageCount: number;
-  isActive: boolean;
+interface CytoscapeEdge {
+  data: {
+    id: string;
+    source: string;
+    target: string;
+    type: string;
+    usageCount: number;
+    isActive: boolean;
+    weight: number;
+    frequency: string;
+    isCritical: boolean;
+    failureImpact: string;
+    latency?: number;
+    errorRate?: number;
+  };
+  classes?: string;
 }
 
 @Component({
   selector: 'app-dependency-graph',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './dependency-graph.component.html',
   styleUrls: ['./dependency-graph.component.scss']
 })
@@ -36,16 +60,43 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
 
   services: Service[] = [];
   dependencies: Dependency[] = [];
-  nodes: GraphNode[] = [];
-  links: GraphLink[] = [];
+  cy: any;
   
-  private svg: any;
-  private simulation: any;
+  // Graph controls
+  selectedLayout = 'cose-bilkent';
+  showLabels = true;
+  showEdgeLabels = true;
+  showMetrics = true;
+  filterByType: string[] = [];
+  filterByStatus: string[] = [];
+  filterByCriticality: string[] = [];
+  searchQuery = '';
+  
+  // Layout options
+  layouts: GraphLayout[] = [
+    { name: 'cose-bilkent', displayName: 'Force Directed', description: 'Natural force-directed layout', config: {} },
+    { name: 'dagre', displayName: 'Hierarchical', description: 'Top-down hierarchical layout', config: {} },
+    { name: 'cola', displayName: 'Constraint', description: 'Constraint-based layout', config: {} },
+    { name: 'avsdf', displayName: 'Circular', description: 'Circular arrangement', config: {} },
+    { name: 'klay', displayName: 'Layered', description: 'Layered graph layout', config: {} }
+  ];
+  
+  // Statistics
+  totalNodes = 0;
+  totalEdges = 0;
+  selectedNode: any = null;
+  selectedEdge: any = null;
+  
   private destroy$ = new Subject<void>();
-  private width = 800;
-  private height = 600;
 
-  constructor(private dependencyService: DependencyService) {}
+  constructor(private dependencyService: DependencyService) {
+    // Register Cytoscape extensions
+    cytoscape.use(dagre);
+    cytoscape.use(cola);
+    cytoscape.use(coseBilkent);
+    cytoscape.use(avsdf);
+    cytoscape.use(klay);
+  }
 
   ngOnInit(): void {
     this.loadData();
@@ -58,6 +109,9 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.cy) {
+      this.cy.destroy();
+    }
   }
 
   private loadData(): void {
@@ -65,296 +119,494 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
       .pipe(takeUntil(this.destroy$))
       .subscribe(services => {
         this.services = services;
-        this.updateGraphData();
+        this.updateGraph();
       });
 
     this.dependencyService.dependencies$
       .pipe(takeUntil(this.destroy$))
       .subscribe(dependencies => {
         this.dependencies = dependencies;
-        this.updateGraphData();
+        this.updateGraph();
       });
-  }
-
-  private updateGraphData(): void {
-    this.prepareGraphData();
-    if (this.svg) {
-      this.renderGraph();
-    }
-  }
-
-  private prepareGraphData(): void {
-    // Convert services to nodes
-    this.nodes = this.services.map(service => ({
-      id: service.id,
-      name: service.name,
-      type: service.type,
-      status: service.status
-    }));
-
-    // Convert dependencies to links
-    this.links = this.dependencies.map(dep => ({
-      source: dep.sourceServiceId,
-      target: dep.targetServiceId,
-      type: dep.dependencyType,
-      usageCount: dep.usageCount,
-      isActive: dep.isActive
-    }));
   }
 
   private initializeGraph(): void {
     const container = this.graphContainer.nativeElement;
-    this.width = container.offsetWidth || 800;
-    this.height = container.offsetHeight || 600;
-
-    // Create SVG
-    this.svg = d3.select(container)
-      .append('svg')
-      .attr('width', this.width)
-      .attr('height', this.height)
-      .attr('viewBox', `0 0 ${this.width} ${this.height}`)
-      .style('background', '#f8fafc');
-
-    // Create zoom behavior
-    const zoom = d3.zoom()
-      .scaleExtent([0.1, 4])
-      .on('zoom', (event) => {
-        this.svg.select('g').attr('transform', event.transform);
-      });
-
-    this.svg.call(zoom);
-
-    // Create main group for zoom
-    this.svg.append('g');
-
-    this.renderGraph();
-  }
-
-  private renderGraph(): void {
-    if (!this.svg || this.nodes.length === 0) return;
-
-    const g = this.svg.select('g');
-
-    // Clear previous graph
-    g.selectAll('*').remove();
-
-    // Create force simulation
-    this.simulation = d3.forceSimulation(this.nodes as any)
-      .force('link', d3.forceLink(this.links).id((d: any) => d.id).distance(100))
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-      .force('collision', d3.forceCollide().radius(50));
-
-    // Create links
-    const link = g.append('g')
-      .attr('class', 'links')
-      .selectAll('line')
-      .data(this.links)
-      .enter().append('line')
-      .attr('stroke', (d: any) => this.getLinkColor(d))
-      .attr('stroke-width', (d: any) => Math.max(1, Math.log(d.usageCount) * 2))
-      .attr('stroke-opacity', (d: any) => d.isActive ? 0.8 : 0.3)
-      .attr('stroke-dasharray', (d: any) => d.isActive ? '0' : '5,5');
-
-    // Create link labels
-    const linkLabels = g.append('g')
-      .attr('class', 'link-labels')
-      .selectAll('text')
-      .data(this.links)
-      .enter().append('text')
-      .attr('font-size', '10px')
-      .attr('fill', '#666')
-      .text((d: any) => d.usageCount > 1000 ? `${(d.usageCount / 1000).toFixed(1)}k` : d.usageCount.toString())
-      .style('text-anchor', 'middle')
-      .style('pointer-events', 'none');
-
-    // Create nodes
-    const node = g.append('g')
-      .attr('class', 'nodes')
-      .selectAll('g')
-      .data(this.nodes)
-      .enter().append('g')
-      .attr('class', 'node')
-      .call(d3.drag()
-        .on('start', this.dragstarted.bind(this))
-        .on('drag', this.dragged.bind(this))
-        .on('end', this.dragended.bind(this)));
-
-    // Add circles for nodes
-    node.append('circle')
-      .attr('r', (d: any) => this.getNodeRadius(d))
-      .attr('fill', (d: any) => this.getNodeColor(d))
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2);
-
-    // Add node labels
-    node.append('text')
-      .attr('dx', 0)
-      .attr('dy', (d: any) => this.getNodeRadius(d) + 15)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '12px')
-      .attr('font-weight', '500')
-      .attr('fill', '#2d3748')
-      .text((d: any) => d.name)
-      .style('pointer-events', 'none');
-
-    // Add type icons
-    node.append('text')
-      .attr('dx', 0)
-      .attr('dy', 0)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '16px')
-      .attr('fill', '#fff')
-      .text((d: any) => this.getTypeIcon(d.type))
-      .style('pointer-events', 'none');
-
-    // Update positions on simulation tick
-    this.simulation.on('tick', () => {
-      link
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
-
-      linkLabels
-        .attr('x', (d: any) => (d.source.x + d.target.x) / 2)
-        .attr('y', (d: any) => (d.source.y + d.target.y) / 2);
-
-      node
-        .attr('transform', (d: any) => `translate(${d.x},${d.y})`);
+    
+    this.cy = cytoscape({
+      container: container,
+      elements: this.prepareGraphData(),
+      style: this.getGraphStyle(),
+      layout: this.getLayoutConfig(),
+      userZoomingEnabled: true,
+      userPanningEnabled: true,
+      boxSelectionEnabled: true,
+      selectionType: 'single',
+      wheelSensitivity: 0.1,
+      minZoom: 0.1,
+      maxZoom: 3
     });
 
-    // Add hover effects
-    node
-      .on('mouseover', this.handleNodeHover.bind(this))
-      .on('mouseout', this.handleNodeOut.bind(this));
+    this.setupEventHandlers();
+    this.updateStatistics();
   }
 
-  private getNodeRadius(node: GraphNode): number {
-    const baseRadius = 25;
-    const dependencies = this.dependencies.filter(
-      d => d.sourceServiceId === node.id || d.targetServiceId === node.id
-    ).length;
-    return baseRadius + (dependencies * 2);
+  private prepareGraphData(): { nodes: CytoscapeNode[], edges: CytoscapeEdge[] } {
+    const nodes: CytoscapeNode[] = this.services.map(service => ({
+      data: {
+        id: service.id,
+        name: service.name,
+        type: service.type,
+        status: service.status,
+        criticality: service.criticality || CriticalityLevel.MEDIUM,
+        team: service.team,
+        environment: service.environment,
+        uptime: service.uptime,
+        responseTime: service.responseTime,
+        errorRate: service.errorRate,
+        dependencies: this.dependencies.filter(d => d.sourceServiceId === service.id).length,
+        weight: this.calculateNodeWeight(service)
+      },
+      classes: this.getNodeClasses(service)
+    }));
+
+    const edges: CytoscapeEdge[] = this.dependencies.map(dep => ({
+      data: {
+        id: dep.id,
+        source: dep.sourceServiceId,
+        target: dep.targetServiceId,
+        type: dep.dependencyType,
+        usageCount: dep.usageCount,
+        isActive: dep.isActive,
+        weight: dep.weight || 5,
+        frequency: dep.frequency || 'MEDIUM',
+        isCritical: dep.isCritical,
+        failureImpact: dep.failureImpact || 'MEDIUM',
+        latency: dep.latency,
+        errorRate: dep.errorRate
+      },
+      classes: this.getEdgeClasses(dep)
+    }));
+
+    return { nodes, edges };
   }
 
-  private getNodeColor(node: GraphNode): string {
-    const colorMap: { [key: string]: string } = {
-      'ACTIVE': '#48bb78',
-      'INACTIVE': '#f56565',
-      'DEPRECATED': '#ed8936',
-      'UNKNOWN': '#a0aec0'
+  private getGraphStyle(): any[] {
+    return [
+      {
+        selector: 'node',
+        style: {
+          'background-color': (ele: any) => this.getNodeColor(ele.data('status')),
+          'border-color': (ele: any) => this.getCriticalityColor(ele.data('criticality')),
+          'border-width': 3,
+          'width': (ele: any) => this.getNodeSize(ele.data('dependencies')),
+          'height': (ele: any) => this.getNodeSize(ele.data('dependencies')),
+          'label': (ele: any) => this.showLabels ? ele.data('name') : '',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '12px',
+          'font-weight': 'bold',
+          'color': '#2d3748',
+          'text-outline-width': 2,
+          'text-outline-color': '#ffffff',
+          'shape': 'round-rectangle'
+        }
+      },
+      {
+        selector: 'node:selected',
+        style: {
+          'border-color': '#667eea',
+          'border-width': 5,
+          'background-color': '#e0e7ff'
+        }
+      },
+      {
+        selector: 'node[criticality="CRITICAL"]',
+        style: {
+          'border-color': '#ef4444',
+          'border-width': 4
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': (ele: any) => Math.max(1, Math.log(ele.data('usageCount')) * 2),
+          'line-color': (ele: any) => this.getEdgeColor(ele.data('type')),
+          'target-arrow-color': (ele: any) => this.getEdgeColor(ele.data('type')),
+          'target-arrow-shape': 'triangle',
+          'target-arrow-size': 8,
+          'curve-style': 'bezier',
+          'opacity': (ele: any) => ele.data('isActive') ? 0.8 : 0.3,
+          'line-style': (ele: any) => ele.data('isActive') ? 'solid' : 'dashed',
+          'label': (ele: any) => this.showEdgeLabels ? this.formatUsageCount(ele.data('usageCount')) : '',
+          'font-size': '10px',
+          'font-weight': 'bold',
+          'color': '#2d3748',
+          'text-outline-width': 1,
+          'text-outline-color': '#ffffff',
+          'text-rotation': 'autorotate'
+        }
+      },
+      {
+        selector: 'edge:selected',
+        style: {
+          'line-color': '#667eea',
+          'target-arrow-color': '#667eea',
+          'width': (ele: any) => Math.max(3, Math.log(ele.data('usageCount')) * 2 + 2)
+        }
+      },
+      {
+        selector: 'edge[isCritical="true"]',
+        style: {
+          'line-color': '#ef4444',
+          'target-arrow-color': '#ef4444',
+          'width': (ele: any) => Math.max(2, Math.log(ele.data('usageCount')) * 2 + 1)
+        }
+      }
+    ];
+  }
+
+  private getLayoutConfig(): any {
+    const layouts: { [key: string]: any } = {
+      'cose-bilkent': {
+        name: 'cose-bilkent',
+        quality: 'default',
+        nodeDimensionsIncludeLabels: true,
+        idealEdgeLength: 100,
+        nodeRepulsion: 4000,
+        nestingFactor: 0.1,
+        gravity: 0.25,
+        numIter: 1000,
+        tile: true,
+        animate: true,
+        animationDuration: 1000,
+        tilingPaddingVertical: 10,
+        tilingPaddingHorizontal: 10,
+        gravityRangeCompound: 1.5,
+        gravityCompound: 0.25,
+        gravityRange: 1.5,
+        initialEnergyOnIncremental: 0.3
+      },
+      'dagre': {
+        name: 'dagre',
+        rankDir: 'TB',
+        nodeDimensionsIncludeLabels: true,
+        animate: true,
+        animationDuration: 1000
+      },
+      'cola': {
+        name: 'cola',
+        animate: true,
+        animationDuration: 1000,
+        randomize: false,
+        maxSimulationTime: 4000,
+        ungrabifyWhileSimulating: false,
+        fit: true,
+        padding: 30,
+        nodeDimensionsIncludeLabels: true,
+        ready: () => {},
+        stop: () => {}
+      },
+      'avsdf': {
+        name: 'avsdf',
+        nodeSep: 20,
+        edgeSep: 10,
+        animate: true,
+        animationDuration: 1000
+      },
+      'klay': {
+        name: 'klay',
+        animate: true,
+        animationDuration: 1000,
+        nodeDimensionsIncludeLabels: true,
+        klay: {
+          direction: 'DOWN',
+          nodeLayering: 'LONGEST_PATH',
+          nodePlacement: 'SIMPLE',
+          edgeRouting: 'ORTHOGONAL',
+          spacing: 40
+        }
+      }
     };
-    return colorMap[node.status] || '#a0aec0';
+
+    return layouts[this.selectedLayout] || layouts['cose-bilkent'];
   }
 
-  private getLinkColor(link: GraphLink): string {
-    const colorMap: { [key: string]: string } = {
+  private setupEventHandlers(): void {
+    // Node events
+    this.cy.on('tap', 'node', (evt: any) => {
+      this.selectedNode = evt.target;
+      this.selectedEdge = null;
+    });
+
+    // Edge events
+    this.cy.on('tap', 'edge', (evt: any) => {
+      this.selectedEdge = evt.target;
+      this.selectedNode = null;
+    });
+
+    // Background click
+    this.cy.on('tap', (evt: any) => {
+      if (evt.target === this.cy) {
+        this.selectedNode = null;
+        this.selectedEdge = null;
+      }
+    });
+
+    // Hover effects
+    this.cy.on('mouseover', 'node', (evt: any) => {
+      const node = evt.target;
+      const connectedEdges = node.connectedEdges();
+      const connectedNodes = node.neighborhood('node');
+      
+      // Highlight connected elements
+      this.cy.elements().style('opacity', 0.3);
+      node.style('opacity', 1);
+      connectedEdges.style('opacity', 1);
+      connectedNodes.style('opacity', 1);
+    });
+
+    this.cy.on('mouseout', 'node', () => {
+      this.cy.elements().style('opacity', 1);
+    });
+
+    // Layout change
+    this.cy.on('layoutstop', () => {
+      this.updateStatistics();
+    });
+  }
+
+  private updateGraph(): void {
+    if (!this.cy) return;
+
+    const elements = this.prepareGraphData();
+    this.cy.elements().remove();
+    this.cy.add(elements);
+    this.cy.layout(this.getLayoutConfig()).run();
+    this.updateStatistics();
+  }
+
+  private updateStatistics(): void {
+    this.totalNodes = this.cy.nodes().length;
+    this.totalEdges = this.cy.edges().length;
+  }
+
+  // Utility methods
+  private calculateNodeWeight(service: Service): number {
+    const dependencies = this.dependencies.filter(d => d.sourceServiceId === service.id).length;
+    const criticality = service.criticality === CriticalityLevel.CRITICAL ? 10 : 
+                      service.criticality === CriticalityLevel.HIGH ? 8 :
+                      service.criticality === CriticalityLevel.MEDIUM ? 5 : 3;
+    return Math.min(10, dependencies + criticality);
+  }
+
+  private getNodeClasses(service: Service): string[] {
+    const classes = [service.status.toLowerCase(), service.criticality.toLowerCase()];
+    if (service.criticality === CriticalityLevel.CRITICAL) classes.push('critical');
+    return classes;
+  }
+
+  private getEdgeClasses(dep: Dependency): string[] {
+    const classes = [dep.dependencyType.toLowerCase()];
+    if (dep.isCritical) classes.push('critical');
+    if (!dep.isActive) classes.push('inactive');
+    return classes;
+  }
+
+  private getNodeColor(status: string): string {
+    const colors: { [key: string]: string } = {
+      'ACTIVE': '#10b981',
+      'INACTIVE': '#ef4444',
+      'DEPRECATED': '#f59e0b',
+      'UNKNOWN': '#6b7280',
+      'MAINTENANCE': '#3b82f6',
+      'ERROR': '#ef4444'
+    };
+    return colors[status] || '#6b7280';
+  }
+
+  private getCriticalityColor(criticality: string): string {
+    const colors: { [key: string]: string } = {
+      'CRITICAL': '#ef4444',
+      'HIGH': '#f59e0b',
+      'MEDIUM': '#3b82f6',
+      'LOW': '#10b981'
+    };
+    return colors[criticality] || '#3b82f6';
+  }
+
+  private getEdgeColor(type: string): string {
+    const colors: { [key: string]: string } = {
       'HTTP_REQUEST': '#667eea',
-      'DATABASE_QUERY': '#48bb78',
-      'MESSAGE_QUEUE': '#ed8936',
-      'FILE_SYSTEM': '#9f7aea',
-      'API_CALL': '#f56565',
-      'DIRECT_DEPENDENCY': '#4299e1'
+      'DATABASE_QUERY': '#10b981',
+      'MESSAGE_QUEUE': '#f59e0b',
+      'FILE_SYSTEM': '#8b5cf6',
+      'API_CALL': '#ef4444',
+      'DIRECT_DEPENDENCY': '#3b82f6',
+      'GRPC_CALL': '#06b6d4',
+      'WEBSOCKET': '#84cc16',
+      'REST_API': '#f97316',
+      'GRAPHQL': '#ec4899',
+      'SOAP': '#6366f1',
+      'EVENT_STREAM': '#14b8a6',
+      'CACHE_ACCESS': '#f59e0b',
+      'SERVICE_DISCOVERY': '#8b5cf6'
     };
-    return colorMap[link.type] || '#a0aec0';
+    return colors[type] || '#6b7280';
   }
 
-  private getTypeIcon(type: string): string {
-    const iconMap: { [key: string]: string } = {
-      'JAVA_APP': '☕',
-      'DOTNET_APP': '🔷',
-      'ANGULAR_APP': '🅰️',
-      'DATABASE': '🗄️',
-      'API': '🔌',
-      'QUEUE': '📨',
-      'EXTERNAL_SERVICE': '🌐'
-    };
-    return iconMap[type] || '❓';
+  private getNodeSize(dependencies: number): number {
+    const baseSize = 30;
+    const maxSize = 80;
+    return Math.min(maxSize, baseSize + (dependencies * 3));
   }
 
-  private dragstarted(event: any, d: any): void {
-    if (!event.active) this.simulation.alphaTarget(0.3).restart();
-    d.fx = d.x;
-    d.fy = d.y;
+  private formatUsageCount(count: number): string {
+    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+    return count.toString();
   }
 
-  private dragged(event: any, d: any): void {
-    d.fx = event.x;
-    d.fy = event.y;
+  // Public methods for UI controls
+  changeLayout(layout: string): void {
+    this.selectedLayout = layout;
+    this.cy.layout(this.getLayoutConfig()).run();
   }
 
-  private dragended(event: any, d: any): void {
-    if (!event.active) this.simulation.alphaTarget(0);
-    d.fx = null;
-    d.fy = null;
+  toggleLabels(): void {
+    this.showLabels = !this.showLabels;
+    this.cy.style().update();
   }
 
-  private handleNodeHover(event: any, d: any): void {
-    // Highlight connected nodes and links
-    const connectedNodes = new Set();
-    const connectedLinks = this.links.filter(link => 
-      link.source === d.id || link.target === d.id
-    );
-
-    connectedLinks.forEach(link => {
-      connectedNodes.add(link.source);
-      connectedNodes.add(link.target);
-    });
-
-    // Update link opacity
-    this.svg.selectAll('.links line')
-      .style('opacity', (link: any) => 
-        connectedLinks.includes(link) ? 1 : 0.1
-      );
-
-    // Update node opacity
-    this.svg.selectAll('.nodes g')
-      .style('opacity', (node: any) => 
-        connectedNodes.has(node.id) ? 1 : 0.3
-      );
+  toggleEdgeLabels(): void {
+    this.showEdgeLabels = !this.showEdgeLabels;
+    this.cy.style().update();
   }
 
-  private handleNodeOut(event: any, d: any): void {
-    // Reset all elements to full opacity
-    this.svg.selectAll('.links line')
-      .style('opacity', 0.8);
-
-    this.svg.selectAll('.nodes g')
-      .style('opacity', 1);
+  toggleMetrics(): void {
+    this.showMetrics = !this.showMetrics;
+    this.cy.style().update();
   }
 
-  // Public methods for external control
-  resetZoom(): void {
-    this.svg.transition().duration(750).call(
-      d3.zoom().transform,
-      d3.zoomIdentity
-    );
-  }
+  applyFilters(): void {
+    if (!this.cy) return;
 
-  centerGraph(): void {
-    if (this.simulation) {
-      this.simulation.alpha(0.3).restart();
+    this.cy.elements().style('display', 'element');
+
+    // Apply type filter
+    if (this.filterByType.length > 0) {
+      this.cy.nodes().forEach((node: any) => {
+        if (!this.filterByType.includes(node.data('type'))) {
+          node.style('display', 'none');
+        }
+      });
     }
+
+    // Apply status filter
+    if (this.filterByStatus.length > 0) {
+      this.cy.nodes().forEach((node: any) => {
+        if (!this.filterByStatus.includes(node.data('status'))) {
+          node.style('display', 'none');
+        }
+      });
+    }
+
+    // Apply criticality filter
+    if (this.filterByCriticality.length > 0) {
+      this.cy.nodes().forEach((node: any) => {
+        if (!this.filterByCriticality.includes(node.data('criticality'))) {
+          node.style('display', 'none');
+        }
+      });
+    }
+
+    // Apply search filter
+    if (this.searchQuery.trim()) {
+      const query = this.searchQuery.toLowerCase();
+      this.cy.nodes().forEach((node: any) => {
+        const name = node.data('name').toLowerCase();
+        const type = node.data('type').toLowerCase();
+        if (!name.includes(query) && !type.includes(query)) {
+          node.style('display', 'none');
+        }
+      });
+    }
+
+    this.cy.layout(this.getLayoutConfig()).run();
+  }
+
+  clearFilters(): void {
+    this.filterByType = [];
+    this.filterByStatus = [];
+    this.filterByCriticality = [];
+    this.searchQuery = '';
+    this.cy.elements().style('display', 'element');
+    this.cy.layout(this.getLayoutConfig()).run();
+  }
+
+  resetZoom(): void {
+    this.cy.animate({
+      zoom: 1,
+      center: { eles: this.cy.elements() }
+    }, {
+      duration: 1000
+    });
+  }
+
+  fitToScreen(): void {
+    this.cy.fit(undefined, 50);
   }
 
   exportGraph(): void {
-    const svgData = new XMLSerializer().serializeToString(this.svg.node());
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
+    const png = this.cy.png({ 
+      output: 'blob',
+      bg: 'white',
+      full: true
+    });
     
-    img.onload = () => {
-      canvas.width = this.width;
-      canvas.height = this.height;
-      ctx?.drawImage(img, 0, 0);
-      
-      const link = document.createElement('a');
-      link.download = 'dependency-graph.png';
-      link.href = canvas.toDataURL();
-      link.click();
-    };
-    
-    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(png);
+    link.download = `dependency-graph-${new Date().toISOString().split('T')[0]}.png`;
+    link.click();
+  }
+
+  exportData(): void {
+    const data = this.dependencyService.exportData();
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dependency-mapping-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Getters for template
+  getServiceTypeOptions(): string[] {
+    return Object.values(ServiceType);
+  }
+
+  getStatusOptions(): string[] {
+    return Object.values(ServiceStatus);
+  }
+
+  getCriticalityOptions(): string[] {
+    return Object.values(CriticalityLevel);
+  }
+
+  getServiceTypeLabel(type: string): string {
+    return type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  getStatusLabel(status: string): string {
+    return status.charAt(0) + status.slice(1).toLowerCase();
+  }
+
+  getCriticalityLabel(criticality: string): string {
+    return criticality.charAt(0) + criticality.slice(1).toLowerCase();
+  }
+
+  getDependencyTypeLabel(type: string): string {
+    return type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
   }
 }

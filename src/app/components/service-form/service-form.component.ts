@@ -4,7 +4,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { DependencyService } from '../../services/dependency.service';
-import { Service, ServiceType, ServiceStatus } from '../../models/service.model';
+import { Service, ServiceType, ServiceStatus, CriticalityLevel } from '../../models/service.model';
 
 @Component({
   selector: 'app-service-form',
@@ -19,6 +19,7 @@ export class ServiceFormComponent implements OnInit, OnDestroy {
   serviceId: string | null = null;
   serviceTypes = Object.values(ServiceType);
   serviceStatuses = Object.values(ServiceStatus);
+  criticalityLevels = Object.values(CriticalityLevel);
   
   private destroy$ = new Subject<void>();
 
@@ -56,7 +57,13 @@ export class ServiceFormComponent implements OnInit, OnDestroy {
       port: ['', [Validators.min(1), Validators.max(65535)]],
       environment: ['production', Validators.required],
       team: [''],
+      owner: [''],
+      version: [''],
       status: [ServiceStatus.ACTIVE, Validators.required],
+      criticality: [CriticalityLevel.MEDIUM, Validators.required],
+      uptime: ['', [Validators.min(0), Validators.max(100)]],
+      responseTime: ['', [Validators.min(0)]],
+      errorRate: ['', [Validators.min(0), Validators.max(100)]],
       tags: [''],
       metadata: ['']
     });
@@ -85,8 +92,14 @@ export class ServiceFormComponent implements OnInit, OnDestroy {
         port: formValue.port ? parseInt(formValue.port) : undefined,
         environment: formValue.environment,
         team: formValue.team,
+        owner: formValue.owner,
+        version: formValue.version,
         lastSeen: new Date(),
         status: formValue.status,
+        criticality: formValue.criticality,
+        uptime: formValue.uptime ? parseFloat(formValue.uptime) : undefined,
+        responseTime: formValue.responseTime ? parseFloat(formValue.responseTime) : undefined,
+        errorRate: formValue.errorRate ? parseFloat(formValue.errorRate) : undefined,
         tags: formValue.tags ? formValue.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag) : [],
         metadata: this.parseMetadata(formValue.metadata)
       };
@@ -171,6 +184,10 @@ export class ServiceFormComponent implements OnInit, OnDestroy {
 
   getServiceStatusLabel(status: string): string {
     return status.charAt(0) + status.slice(1).toLowerCase();
+  }
+
+  getCriticalityLabel(level: string): string {
+    return level.charAt(0) + level.slice(1).toLowerCase();
   }
 
   isFieldInvalid(fieldName: string): boolean {
