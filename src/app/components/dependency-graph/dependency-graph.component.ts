@@ -71,6 +71,8 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
   filterByStatus: string[] = [];
   filterByCriticality: string[] = [];
   searchQuery = '';
+  selectedApplicationId: string = '';
+  applicationOptions: { id: string; name: string }[] = [];
   
   // Layout options
   layouts: GraphLayout[] = [
@@ -119,6 +121,27 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
       .pipe(takeUntil(this.destroy$))
       .subscribe(services => {
         this.services = services;
+        const appTypes: ServiceType[] = [
+          ServiceType.MICROSERVICE,
+          ServiceType.JAVA_APP,
+          ServiceType.DOTNET_APP,
+          ServiceType.NODE_APP,
+          ServiceType.PYTHON_APP,
+          ServiceType.ANGULAR_APP,
+          ServiceType.REACT_APP,
+          ServiceType.VUE_APP,
+          ServiceType.EXTERNAL_SERVICE
+        ];
+        let apps = services.filter(s => appTypes.includes(s.type) && s.id.startsWith('app-'));
+        if (apps.length === 0) {
+          apps = services.filter(s => s.id.startsWith('app-'));
+          if (apps.length === 0) {
+            apps = services; // final fallback
+          }
+        }
+        this.applicationOptions = apps
+          .map(s => ({ id: s.id, name: s.name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
         this.updateGraph();
       });
 
@@ -493,6 +516,21 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
 
     this.cy.elements().style('display', 'element');
 
+    // Apply selected application filter (single-select)
+    if (this.selectedApplicationId) {
+      const appId = this.selectedApplicationId;
+      // Hide everything initially
+      this.cy.elements().style('display', 'none');
+      // Show the selected node
+      const node = this.cy.getElementById(appId);
+      node.style('display', 'element');
+      // Show edges connected to the node and their opposite nodes
+      const connectedEdges = node.connectedEdges();
+      connectedEdges.style('display', 'element');
+      const neighborNodes = node.neighborhood('node');
+      neighborNodes.style('display', 'element');
+    }
+
     // Apply type filter
     if (this.filterByType.length > 0) {
       this.cy.nodes().forEach((node: any) => {
@@ -540,6 +578,7 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
     this.filterByStatus = [];
     this.filterByCriticality = [];
     this.searchQuery = '';
+    this.selectedApplicationId = '';
     this.cy.elements().style('display', 'element');
     this.cy.layout(this.getLayoutConfig()).run();
   }
@@ -608,5 +647,16 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
 
   getDependencyTypeLabel(type: string): string {
     return type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  onApplicationChange(): void {
+    this.applyFilters();
+    // Focus on the selected node if any
+    if (this.selectedApplicationId && this.cy) {
+      const node = this.cy.getElementById(this.selectedApplicationId);
+      if (node) {
+        this.cy.animate({ center: { eles: node }, zoom: 1.2 }, { duration: 600 });
+      }
+    }
   }
 }

@@ -28,35 +28,32 @@
     </div>
 
     <div class="control-group">
-      <label>Search:</label>
-      <input 
-        type="text" 
-        [(ngModel)]="searchQuery" 
-        (input)="applyFilters()"
-        placeholder="Search services..."
-        class="control-input"
-      >
+      <label>Application:</label>
+      <select [(ngModel)]="selectedApplicationId" [ngModelOptions]="{standalone: true}" (change)="onApplicationChange()" class="control-select">
+        <option [ngValue]="''">All Applications</option>
+        <option *ngFor="let app of applicationOptions" [ngValue]="app.id">{{ app.name }}</option>
+      </select>
     </div>
 
     
 
     <div class="control-group">
       <label class="checkbox-label">
-        <input type="checkbox" [(ngModel)]="showLabels" (change)="toggleLabels()">
+        <input type="checkbox" [checked]="showLabels" (change)="toggleLabels()">
         Show Labels
       </label>
     </div>
 
     <div class="control-group">
       <label class="checkbox-label">
-        <input type="checkbox" [(ngModel)]="showEdgeLabels" (change)="toggleEdgeLabels()">
+        <input type="checkbox" [checked]="showEdgeLabels" (change)="toggleEdgeLabels()">
         Show Edge Labels
       </label>
     </div>
 
     <div class="control-group">
       <label class="checkbox-label">
-        <input type="checkbox" [(ngModel)]="showMetrics" (change)="toggleMetrics()">
+        <input type="checkbox" [checked]="showMetrics" (change)="toggleMetrics()">
         Show Metrics
       </label>
     </div>

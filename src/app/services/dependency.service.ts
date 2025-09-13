@@ -22,7 +22,6 @@ export class DependencyService {
   addService(service: Service): void {
     const currentServices = this.servicesSubject.value;
     this.servicesSubject.next([...currentServices, service]);
-    this.saveToLocalStorage();
   }
 
   updateService(service: Service): void {
@@ -31,7 +30,6 @@ export class DependencyService {
     if (index !== -1) {
       currentServices[index] = service;
       this.servicesSubject.next([...currentServices]);
-      this.saveToLocalStorage();
     }
   }
 
@@ -46,8 +44,6 @@ export class DependencyService {
       d => d.sourceServiceId !== serviceId && d.targetServiceId !== serviceId
     );
     this.dependenciesSubject.next(filteredDependencies);
-    
-    this.saveToLocalStorage();
   }
 
   getServiceById(id: string): Service | undefined {
@@ -58,7 +54,6 @@ export class DependencyService {
   addDependency(dependency: Dependency): void {
     const currentDependencies = this.dependenciesSubject.value;
     this.dependenciesSubject.next([...currentDependencies, dependency]);
-    this.saveToLocalStorage();
   }
 
   updateDependency(dependency: Dependency): void {
@@ -67,7 +62,6 @@ export class DependencyService {
     if (index !== -1) {
       currentDependencies[index] = dependency;
       this.dependenciesSubject.next([...currentDependencies]);
-      this.saveToLocalStorage();
     }
   }
 
@@ -75,7 +69,6 @@ export class DependencyService {
     const currentDependencies = this.dependenciesSubject.value;
     const filteredDependencies = currentDependencies.filter(d => d.id !== dependencyId);
     this.dependenciesSubject.next(filteredDependencies);
-    this.saveToLocalStorage();
   }
 
   getDependenciesForService(serviceId: string): Dependency[] {
@@ -94,7 +87,6 @@ export class DependencyService {
       currentAnalytics.push(analytics);
     }
     this.analyticsSubject.next([...currentAnalytics]);
-    this.saveToLocalStorage();
   }
 
   getAnalyticsForService(serviceId: string): UsageAnalytics | undefined {
@@ -120,295 +112,102 @@ export class DependencyService {
     return this.servicesSubject.value.filter(service => service.status === status);
   }
 
-  // Data Persistence
-  private saveToLocalStorage(): void {
-    localStorage.setItem('dependency-mapping-services', JSON.stringify(this.servicesSubject.value));
-    localStorage.setItem('dependency-mapping-dependencies', JSON.stringify(this.dependenciesSubject.value));
-    localStorage.setItem('dependency-mapping-analytics', JSON.stringify(this.analyticsSubject.value));
-  }
-
-  private loadFromLocalStorage(): void {
-    const services = localStorage.getItem('dependency-mapping-services');
-    const dependencies = localStorage.getItem('dependency-mapping-dependencies');
-    const analytics = localStorage.getItem('dependency-mapping-analytics');
-
-    if (services) {
-      this.servicesSubject.next(JSON.parse(services));
-    }
-    if (dependencies) {
-      this.dependenciesSubject.next(JSON.parse(dependencies));
-    }
-    if (analytics) {
-      this.analyticsSubject.next(JSON.parse(analytics));
-    }
-  }
-
   private loadInitialData(): void {
-    this.loadFromLocalStorage();
-    
-    // If no data exists, load sample data
-    if (this.servicesSubject.value.length === 0) {
-      this.loadSampleData();
-    }
+    // Always generate fresh mock data; do not use localStorage
+    this.generateMockApplications(10, 15);
   }
+  private generateMockApplications(numApps: number, depsPerApp: number): void {
+    const services: Service[] = [];
+    const dependencies: Dependency[] = [];
 
-  private loadSampleData(): void {
-    // Focused mock: a single subject system interacting with HP NonStop ITP,
-    // multiple databases, and message queues/brokers.
-    const subjectSystem: Service = {
-      id: 'sys',
-      name: 'Payment Orchestrator',
-      type: ServiceType.MICROSERVICE,
-      description: 'Subject system whose interactions are being mapped',
-      environment: 'production',
-      team: 'Core Payments',
-      owner: 'Payments Platform',
-      version: '3.4.0',
-      lastSeen: new Date(),
-      status: ServiceStatus.ACTIVE,
-      criticality: CriticalityLevel.CRITICAL,
-      uptime: 99.97,
-      responseTime: 95,
-      errorRate: 0.08,
-      tags: ['payments', 'core', 'subject-system'],
-      metadata: { language: 'Java', framework: 'Spring Boot' }
-    };
+    // Create primary applications
+    for (let i = 1; i <= numApps; i++) {
+      services.push({
+        id: `app-${i}`,
+        name: `Application ${i}`,
+        type: ServiceType.MICROSERVICE,
+        description: `Generated application ${i}`,
+        environment: 'production',
+        team: 'Team ' + ((i % 5) + 1),
+        owner: 'Owner ' + ((i % 3) + 1),
+        version: `v${(i % 4) + 1}.0.${(i % 10)}`,
+        lastSeen: new Date(),
+        status: ServiceStatus.ACTIVE,
+        criticality: [CriticalityLevel.CRITICAL, CriticalityLevel.HIGH, CriticalityLevel.MEDIUM, CriticalityLevel.LOW][i % 4],
+        uptime: 99 + Math.random(),
+        responseTime: Math.floor(50 + Math.random() * 150),
+        errorRate: parseFloat((Math.random() * 1).toFixed(2)),
+        tags: ['generated', 'app'],
+        metadata: { language: ['Java', 'Node', 'Python'][i % 3] }
+      });
+    }
 
-    const hpNonStopItp: Service = {
-      id: 'itp',
-      name: 'HP NonStop ITP',
-      type: ServiceType.EXTERNAL_SERVICE,
-      description: 'Transaction processing on HP NonStop ITP',
-      environment: 'production',
-      team: 'Mainframe Ops',
-      owner: 'Mainframe Team',
-      version: 'v1',
-      lastSeen: new Date(),
-      status: ServiceStatus.ACTIVE,
-      criticality: CriticalityLevel.CRITICAL,
-      uptime: 99.99,
-      responseTime: 40,
-      errorRate: 0.02,
-      tags: ['nonstop', 'itp', 'transaction'],
-      metadata: { protocol: 'TCP', port: 1025 }
-    };
+    // Create a pool of additional applications to depend on
+    const extraPoolSize = Math.max(depsPerApp + 5, 25);
+    for (let j = 1; j <= extraPoolSize; j++) {
+      services.push({
+        id: `svc-${j}`,
+        name: `Service ${j}`,
+        type: ServiceType.MICROSERVICE,
+        description: `Support service ${j}`,
+        environment: 'production',
+        team: 'Shared Services',
+        owner: 'Platform',
+        version: `v${(j % 3) + 1}.${(j % 9)}`,
+        lastSeen: new Date(),
+        status: ServiceStatus.ACTIVE,
+        criticality: [CriticalityLevel.HIGH, CriticalityLevel.MEDIUM, CriticalityLevel.LOW][j % 3],
+        uptime: 99 + Math.random(),
+        responseTime: Math.floor(20 + Math.random() * 100),
+        errorRate: parseFloat((Math.random() * 1).toFixed(2)),
+        tags: ['generated', 'support'],
+        metadata: {}
+      });
+    }
 
-    // Databases (multiple)
-    const oracleCore: Service = {
-      id: 'db-oracle',
-      name: 'Core Banking DB (Oracle)',
-      type: ServiceType.DATABASE,
-      description: 'Oracle database for core banking',
-      environment: 'production',
-      team: 'DBA',
-      owner: 'Data Platform',
-      version: '19c',
-      lastSeen: new Date(),
-      status: ServiceStatus.ACTIVE,
-      criticality: CriticalityLevel.CRITICAL,
-      uptime: 99.95,
-      responseTime: 7,
-      errorRate: 0.03,
-      tags: ['oracle', 'core-banking'],
-      metadata: { engine: 'Oracle', host: 'oracle-core.company.com' }
-    };
-
-    const postgresCustomer: Service = {
-      id: 'db-pg',
-      name: 'Customer DB (PostgreSQL)',
-      type: ServiceType.DATABASE,
-      description: 'Customer data store',
-      environment: 'production',
-      team: 'DBA',
-      owner: 'Customer Data',
-      version: '14',
-      lastSeen: new Date(),
-      status: ServiceStatus.ACTIVE,
-      criticality: CriticalityLevel.HIGH,
-      uptime: 99.9,
-      responseTime: 6,
-      errorRate: 0.02,
-      tags: ['postgresql', 'customers'],
-      metadata: { engine: 'PostgreSQL', host: 'pg-customers.company.com' }
-    };
-
-    const db2Ledger: Service = {
-      id: 'db-db2',
-      name: 'Ledger DB (DB2)',
-      type: ServiceType.DATABASE,
-      description: 'Financial ledger',
-      environment: 'production',
-      team: 'Finance IT',
-      owner: 'Finance',
-      version: '11.5',
-      lastSeen: new Date(),
-      status: ServiceStatus.ACTIVE,
-      criticality: CriticalityLevel.CRITICAL,
-      uptime: 99.9,
-      responseTime: 9,
-      errorRate: 0.05,
-      tags: ['db2', 'ledger'],
-      metadata: { engine: 'DB2', host: 'db2-ledger.company.com' }
-    };
-
-    // Messaging
-    const ibmMq: Service = {
-      id: 'mq-ibm',
-      name: 'Payments MQ (IBM MQ)',
-      type: ServiceType.QUEUE,
-      description: 'Synchronous/async payments queue',
-      environment: 'production',
-      team: 'Messaging',
-      owner: 'Middleware',
-      version: '9.3',
-      lastSeen: new Date(),
-      status: ServiceStatus.ACTIVE,
-      criticality: CriticalityLevel.HIGH,
-      uptime: 99.99,
-      responseTime: 3,
-      errorRate: 0.01,
-      tags: ['ibm-mq', 'payments'],
-      metadata: { queueManager: 'QM1', channel: 'SYSTEM.DEF.SVRCONN' }
-    };
-
-    const kafkaBroker: Service = {
-      id: 'mq-kafka',
-      name: 'Events Kafka',
-      type: ServiceType.MESSAGE_BROKER,
-      description: 'Event streaming for notifications & audit',
-      environment: 'production',
-      team: 'Messaging',
-      owner: 'Data Streaming',
-      version: '3.6',
-      lastSeen: new Date(),
-      status: ServiceStatus.ACTIVE,
-      criticality: CriticalityLevel.MEDIUM,
-      uptime: 99.9,
-      responseTime: 4,
-      errorRate: 0.02,
-      tags: ['kafka', 'events'],
-      metadata: { cluster: 'kafka-prod', topics: ['payments.events', 'notifications.events'] }
-    };
-
-    const sampleServices: Service[] = [
-      subjectSystem,
-      hpNonStopItp,
-      oracleCore,
-      postgresCustomer,
-      db2Ledger,
-      ibmMq,
-      kafkaBroker
+    // Build dependencies: each primary app depends on depsPerApp distinct services from pool
+    const poolIds = services.filter(s => s.id.startsWith('svc-')).map(s => s.id);
+    const depTypes = [
+      DependencyType.API_CALL,
+      DependencyType.GRPC_CALL,
+      DependencyType.REST_API,
+      DependencyType.WEBSOCKET,
+      DependencyType.DIRECT_DEPENDENCY
     ];
 
-    const sampleDependencies: Dependency[] = [
-      // Subject system interactions
-      {
-        id: 'dep-itp',
-        sourceServiceId: 'sys',
-        targetServiceId: 'itp',
-        dependencyType: DependencyType.API_CALL,
-        usageCount: 25000,
-        lastUsed: new Date(),
-        description: 'Submit and inquire transactions on HP NonStop ITP',
-        isActive: true,
-        weight: 9,
-        frequency: 'HIGH',
-        isCritical: true,
-        failureImpact: 'HIGH',
-        latency: 40,
-        errorRate: 0.08,
-        metadata: { protocol: 'TCP', operation: 'TRANSACTION', endpoint: 'itp:1025' }
-      },
-      {
-        id: 'dep-oracle',
-        sourceServiceId: 'sys',
-        targetServiceId: 'db-oracle',
-        dependencyType: DependencyType.DATABASE_QUERY,
-        usageCount: 120000,
-        lastUsed: new Date(),
-        description: 'Core account writes & reads',
-        isActive: true,
-        weight: 10,
-        frequency: 'HIGH',
-        isCritical: true,
-        failureImpact: 'HIGH',
-        latency: 7,
-        errorRate: 0.03,
-        metadata: { schema: 'CORE', operation: 'SELECT/UPDATE' }
-      },
-      {
-        id: 'dep-pg',
-        sourceServiceId: 'sys',
-        targetServiceId: 'db-pg',
-        dependencyType: DependencyType.DATABASE_QUERY,
-        usageCount: 65000,
-        lastUsed: new Date(),
-        description: 'Customer profile reads',
-        isActive: true,
-        weight: 7,
-        frequency: 'HIGH',
-        isCritical: true,
-        failureImpact: 'MEDIUM',
-        latency: 6,
-        errorRate: 0.02,
-        metadata: { schema: 'customers', operation: 'SELECT' }
-      },
-      {
-        id: 'dep-db2',
-        sourceServiceId: 'sys',
-        targetServiceId: 'db-db2',
-        dependencyType: DependencyType.DATABASE_QUERY,
-        usageCount: 42000,
-        lastUsed: new Date(),
-        description: 'Ledger postings',
-        isActive: true,
-        weight: 8,
-        frequency: 'HIGH',
-        isCritical: true,
-        failureImpact: 'HIGH',
-        latency: 9,
-        errorRate: 0.05,
-        metadata: { schema: 'ledger', operation: 'INSERT' }
-      },
-      {
-        id: 'dep-mq',
-        sourceServiceId: 'sys',
-        targetServiceId: 'mq-ibm',
-        dependencyType: DependencyType.MESSAGE_QUEUE,
-        usageCount: 90000,
-        lastUsed: new Date(),
-        description: 'Enqueue payment instructions and status updates',
-        isActive: true,
-        weight: 8,
-        frequency: 'HIGH',
-        isCritical: true,
-        failureImpact: 'MEDIUM',
-        latency: 12,
-        errorRate: 0.02,
-        metadata: { queue: 'PAYMENTS.IN', dlq: 'DLQ.PAYMENTS' }
-      },
-      {
-        id: 'dep-kafka',
-        sourceServiceId: 'sys',
-        targetServiceId: 'mq-kafka',
-        dependencyType: DependencyType.EVENT_STREAM,
-        usageCount: 30000,
-        lastUsed: new Date(),
-        description: 'Publish payment event notifications',
-        isActive: true,
-        weight: 6,
-        frequency: 'MEDIUM',
-        isCritical: false,
-        failureImpact: 'LOW',
-        latency: 8,
-        errorRate: 0.01,
-        metadata: { topic: 'payments.events', key: 'paymentId' }
+    for (let i = 1; i <= numApps; i++) {
+      const sourceId = `app-${i}`;
+      const chosen = new Set<string>();
+      while (chosen.size < depsPerApp) {
+        const target = poolIds[Math.floor(Math.random() * poolIds.length)];
+        if (!chosen.has(target) && target !== sourceId) {
+          chosen.add(target);
+        }
       }
-    ];
+      Array.from(chosen).forEach((targetId, idx) => {
+        const t = depTypes[idx % depTypes.length];
+        dependencies.push({
+          id: `dep-${sourceId}-${idx}`,
+          sourceServiceId: sourceId,
+          targetServiceId: targetId,
+          dependencyType: t,
+          usageCount: Math.floor(1000 + Math.random() * 100000),
+          lastUsed: new Date(),
+          description: `${sourceId} -> ${targetId}`,
+          isActive: true,
+          weight: Math.max(1, Math.floor(Math.random() * 10)),
+          frequency: ['HIGH', 'MEDIUM', 'LOW'][idx % 3] as 'HIGH' | 'MEDIUM' | 'LOW',
+          isCritical: Math.random() < 0.4,
+          failureImpact: ['HIGH', 'MEDIUM', 'LOW'][Math.floor(Math.random() * 3)] as 'HIGH' | 'MEDIUM' | 'LOW',
+          latency: Math.floor(5 + Math.random() * 200),
+          errorRate: parseFloat((Math.random() * 2).toFixed(2)),
+          metadata: {}
+        });
+      });
+    }
 
-    this.servicesSubject.next(sampleServices);
-    this.dependenciesSubject.next(sampleDependencies);
-    this.saveToLocalStorage();
+    this.servicesSubject.next(services);
+    this.dependenciesSubject.next(dependencies);
   }
 
   // Export/Import
@@ -433,7 +232,6 @@ export class DependencyService {
       if (parsed.analytics) {
         this.analyticsSubject.next(parsed.analytics);
       }
-      this.saveToLocalStorage();
       return true;
     } catch (error) {
       console.error('Error importing data:', error);
