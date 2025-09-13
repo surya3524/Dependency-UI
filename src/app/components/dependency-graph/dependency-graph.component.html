@@ -19,19 +19,19 @@
   <!-- Controls Panel -->
   <div class="controls-panel">
     <div class="control-group">
+      <label>Application:</label>
+      <select [(ngModel)]="selectedApplicationId" [ngModelOptions]="{standalone: true}" (change)="onApplicationChange()" class="control-select">
+        <option [ngValue]="''" [disabled]="true">Please select an application...</option>
+        <option *ngFor="let app of applicationOptions" [ngValue]="app.id">{{ app.name }}</option>
+      </select>
+    </div>
+
+    <div class="control-group">
       <label>Layout:</label>
       <select [(ngModel)]="selectedLayout" (change)="changeLayout(selectedLayout)" class="control-select">
         <option *ngFor="let layout of layouts" [value]="layout.name">
           {{ layout.displayName }}
         </option>
-      </select>
-    </div>
-
-    <div class="control-group">
-      <label>Application:</label>
-      <select [(ngModel)]="selectedApplicationId" [ngModelOptions]="{standalone: true}" (change)="onApplicationChange()" class="control-select">
-        <option [ngValue]="''">All Applications</option>
-        <option *ngFor="let app of applicationOptions" [ngValue]="app.id">{{ app.name }}</option>
       </select>
     </div>
 
@@ -80,21 +80,7 @@
     </div>
   </div>
 
-  <!-- Statistics Panel -->
-  <div class="stats-panel">
-    <div class="stat-item">
-      <span class="stat-label">Nodes:</span>
-      <span class="stat-value">{{ totalNodes }}</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-label">Edges:</span>
-      <span class="stat-value">{{ totalEdges }}</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-label">Layout:</span>
-      <span class="stat-value">{{ selectedLayout }}</span>
-    </div>
-  </div>
+  
 
   <!-- Selection Details Panel -->
   <div class="details-panel" *ngIf="selectedNode || selectedEdge">

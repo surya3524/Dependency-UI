@@ -142,14 +142,18 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
         this.applicationOptions = apps
           .map(s => ({ id: s.id, name: s.name }))
           .sort((a, b) => a.name.localeCompare(b.name));
-        this.updateGraph();
+        if (this.selectedApplicationId) {
+          this.updateGraphForSelection();
+        }
       });
 
     this.dependencyService.dependencies$
       .pipe(takeUntil(this.destroy$))
       .subscribe(dependencies => {
         this.dependencies = dependencies;
-        this.updateGraph();
+        if (this.selectedApplicationId) {
+          this.updateGraphForSelection();
+        }
       });
   }
 
@@ -158,7 +162,7 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
     
     this.cy = cytoscape({
       container: container,
-      elements: this.prepareGraphData(),
+      elements: [],
       style: this.getGraphStyle(),
       layout: this.getLayoutConfig(),
       userZoomingEnabled: true,
@@ -409,6 +413,91 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
     this.updateStatistics();
   }
 
+  private updateGraphForSelection(): void {
+    if (!this.cy) return;
+    this.cy.elements().remove();
+    if (!this.selectedApplicationId) {
+      this.updateStatistics();
+      return;
+    }
+
+    const app = this.services.find(s => s.id === this.selectedApplicationId);
+    if (!app) {
+      this.updateStatistics();
+      return;
+    }
+
+    const outgoing = this.dependencies.filter(d => d.sourceServiceId === this.selectedApplicationId);
+
+    const nodes: CytoscapeNode[] = [];
+    const edges: CytoscapeEdge[] = [];
+
+    nodes.push({
+      data: {
+        id: app.id,
+        name: app.name,
+        type: app.type,
+        status: app.status,
+        criticality: app.criticality || CriticalityLevel.MEDIUM,
+        team: app.team,
+        environment: app.environment,
+        uptime: app.uptime,
+        responseTime: app.responseTime,
+        errorRate: app.errorRate,
+        dependencies: outgoing.length,
+        weight: this.calculateNodeWeight(app)
+      },
+      classes: this.getNodeClasses(app)
+    });
+
+    outgoing.forEach(dep => {
+      const target = this.services.find(s => s.id === dep.targetServiceId);
+      if (target) {
+        if (!nodes.find(n => n.data.id === target.id)) {
+          nodes.push({
+            data: {
+              id: target.id,
+              name: target.name,
+              type: target.type,
+              status: target.status,
+              criticality: target.criticality || CriticalityLevel.MEDIUM,
+              team: target.team,
+              environment: target.environment,
+              uptime: target.uptime,
+              responseTime: target.responseTime,
+              errorRate: target.errorRate,
+              dependencies: this.dependencies.filter(d => d.sourceServiceId === target.id).length,
+              weight: this.calculateNodeWeight(target)
+            },
+            classes: this.getNodeClasses(target)
+          });
+        }
+
+        edges.push({
+          data: {
+            id: dep.id,
+            source: dep.sourceServiceId,
+            target: dep.targetServiceId,
+            type: dep.dependencyType,
+            usageCount: dep.usageCount,
+            isActive: dep.isActive,
+            weight: dep.weight || 5,
+            frequency: dep.frequency || 'MEDIUM',
+            isCritical: dep.isCritical,
+            failureImpact: dep.failureImpact || 'MEDIUM',
+            latency: dep.latency,
+            errorRate: dep.errorRate
+          },
+          classes: this.getEdgeClasses(dep)
+        });
+      }
+    });
+
+    this.cy.add({ nodes, edges });
+    this.cy.layout(this.getLayoutConfig()).run();
+    this.updateStatistics();
+  }
+
   private updateStatistics(): void {
     this.totalNodes = this.cy.nodes().length;
     this.totalEdges = this.cy.edges().length;
@@ -650,11 +739,10 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   onApplicationChange(): void {
-    this.applyFilters();
-    // Focus on the selected node if any
+    this.updateGraphForSelection();
     if (this.selectedApplicationId && this.cy) {
       const node = this.cy.getElementById(this.selectedApplicationId);
-      if (node) {
+      if (node && node.length) {
         this.cy.animate({ center: { eles: node }, zoom: 1.2 }, { duration: 600 });
       }
     }
