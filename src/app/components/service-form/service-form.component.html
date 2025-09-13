@@ -1,0 +1,175 @@
+<div class="service-form-container">
+  <div class="form-header">
+    <h1>{{ isEditMode ? 'Edit Service' : 'Add New Service' }}</h1>
+    <p>{{ isEditMode ? 'Update service information' : 'Add a new service to the dependency mapping tool' }}</p>
+  </div>
+
+  <form [formGroup]="serviceForm" (ngSubmit)="onSubmit()" class="service-form">
+    <div class="form-grid">
+      <!-- Basic Information -->
+      <div class="form-section">
+        <h3>Basic Information</h3>
+        
+        <div class="form-group">
+          <label for="name">Service Name *</label>
+          <input 
+            type="text" 
+            id="name" 
+            formControlName="name" 
+            placeholder="Enter service name"
+            [class.invalid]="isFieldInvalid('name')"
+          >
+          <div class="error-message" *ngIf="getFieldError('name')">
+            {{ getFieldError('name') }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="type">Service Type *</label>
+          <select 
+            id="type" 
+            formControlName="type"
+            [class.invalid]="isFieldInvalid('type')"
+          >
+            <option value="">Select service type</option>
+            <option *ngFor="let type of serviceTypes" [value]="type">
+              {{ getServiceTypeLabel(type) }}
+            </option>
+          </select>
+          <div class="error-message" *ngIf="getFieldError('type')">
+            {{ getFieldError('type') }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description</label>
+          <textarea 
+            id="description" 
+            formControlName="description" 
+            placeholder="Enter service description"
+            rows="3"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Connection Details -->
+      <div class="form-section">
+        <h3>Connection Details</h3>
+        
+        <div class="form-group">
+          <label for="url">URL</label>
+          <input 
+            type="url" 
+            id="url" 
+            formControlName="url" 
+            placeholder="https://service.example.com"
+            [class.invalid]="isFieldInvalid('url')"
+          >
+          <div class="error-message" *ngIf="getFieldError('url')">
+            {{ getFieldError('url') }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="port">Port</label>
+          <input 
+            type="number" 
+            id="port" 
+            formControlName="port" 
+            placeholder="8080"
+            min="1"
+            max="65535"
+            [class.invalid]="isFieldInvalid('port')"
+          >
+          <div class="error-message" *ngIf="getFieldError('port')">
+            {{ getFieldError('port') }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="environment">Environment *</label>
+          <select 
+            id="environment" 
+            formControlName="environment"
+            [class.invalid]="isFieldInvalid('environment')"
+          >
+            <option value="production">Production</option>
+            <option value="staging">Staging</option>
+            <option value="development">Development</option>
+            <option value="test">Test</option>
+          </select>
+          <div class="error-message" *ngIf="getFieldError('environment')">
+            {{ getFieldError('environment') }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Organization Details -->
+      <div class="form-section">
+        <h3>Organization Details</h3>
+        
+        <div class="form-group">
+          <label for="team">Team</label>
+          <input 
+            type="text" 
+            id="team" 
+            formControlName="team" 
+            placeholder="Enter team name"
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="status">Status *</label>
+          <select 
+            id="status" 
+            formControlName="status"
+            [class.invalid]="isFieldInvalid('status')"
+          >
+            <option *ngFor="let status of serviceStatuses" [value]="status">
+              {{ getServiceStatusLabel(status) }}
+            </option>
+          </select>
+          <div class="error-message" *ngIf="getFieldError('status')">
+            {{ getFieldError('status') }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="tags">Tags</label>
+          <input 
+            type="text" 
+            id="tags" 
+            formControlName="tags" 
+            placeholder="authentication, user-management, api"
+          >
+          <small class="help-text">Separate tags with commas</small>
+        </div>
+      </div>
+
+      <!-- Advanced Configuration -->
+      <div class="form-section full-width">
+        <h3>Advanced Configuration</h3>
+        
+        <div class="form-group">
+          <label for="metadata">Metadata (JSON)</label>
+          <textarea 
+            id="metadata" 
+            formControlName="metadata" 
+            placeholder='{"version": "1.0.0", "framework": "Spring Boot"}'
+            rows="4"
+          ></textarea>
+          <small class="help-text">Enter additional metadata as JSON (optional)</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" (click)="onCancel()" class="btn btn-secondary">
+        Cancel
+      </button>
+      <button type="submit" [disabled]="serviceForm.invalid" class="btn btn-primary">
+        {{ isEditMode ? 'Update Service' : 'Add Service' }}
+      </button>
+    </div>
+  </form>
+</div>
