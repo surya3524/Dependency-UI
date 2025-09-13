@@ -13,8 +13,8 @@ import { Service, Dependency, ServiceType, ServiceStatus, CriticalityLevel, Depe
 
 interface CytoscapeNode {
   data: {
-    id: string;
-    name: string;
+  id: string;
+  name: string;
     type: ServiceType;
     status: ServiceStatus;
     criticality: CriticalityLevel;
@@ -36,8 +36,8 @@ interface CytoscapeEdge {
     source: string;
     target: string;
     type: DependencyType;
-    usageCount: number;
-    isActive: boolean;
+  usageCount: number;
+  isActive: boolean;
     weight: number;
     frequency: string;
     isCritical: boolean;
@@ -154,9 +154,9 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
   private prepareGraphData(): { nodes: CytoscapeNode[], edges: CytoscapeEdge[] } {
     const nodes: CytoscapeNode[] = this.services.map(service => ({
       data: {
-        id: service.id,
-        name: service.name,
-        type: service.type,
+      id: service.id,
+      name: service.name,
+      type: service.type,
         status: service.status,
         criticality: service.criticality || CriticalityLevel.MEDIUM,
         team: service.team,
@@ -173,10 +173,10 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
     const edges: CytoscapeEdge[] = this.dependencies.map(dep => ({
       data: {
         id: dep.id,
-        source: dep.sourceServiceId,
-        target: dep.targetServiceId,
-        type: dep.dependencyType,
-        usageCount: dep.usageCount,
+      source: dep.sourceServiceId,
+      target: dep.targetServiceId,
+      type: dep.dependencyType,
+      usageCount: dep.usageCount,
         isActive: dep.isActive,
         weight: dep.weight || 5,
         frequency: dep.frequency || 'MEDIUM',
@@ -563,8 +563,8 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
       bg: 'white',
       full: true
     });
-    
-    const link = document.createElement('a');
+      
+      const link = document.createElement('a');
     link.href = URL.createObjectURL(png);
     link.download = `dependency-graph-${new Date().toISOString().split('T')[0]}.png`;
     link.click();
@@ -577,7 +577,7 @@ export class DependencyGraphComponent implements OnInit, OnDestroy, AfterViewIni
     const link = document.createElement('a');
     link.href = url;
     link.download = `dependency-mapping-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
+      link.click();
     window.URL.revokeObjectURL(url);
   }
 

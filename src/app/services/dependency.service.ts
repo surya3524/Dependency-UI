@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { Service, Dependency, UsageAnalytics } from '../models/service.model';
+import { Service, Dependency, UsageAnalytics, ServiceType, ServiceStatus, CriticalityLevel, DependencyType } from '../models/service.model';
 
 @Injectable({
   providedIn: 'root'
@@ -153,139 +153,256 @@ export class DependencyService {
   }
 
   private loadSampleData(): void {
+    // Focused mock: a single subject system interacting with HP NonStop ITP,
+    // multiple databases, and message queues/brokers.
+    const subjectSystem: Service = {
+      id: 'sys',
+      name: 'Payment Orchestrator',
+      type: ServiceType.MICROSERVICE,
+      description: 'Subject system whose interactions are being mapped',
+      environment: 'production',
+      team: 'Core Payments',
+      owner: 'Payments Platform',
+      version: '3.4.0',
+      lastSeen: new Date(),
+      status: ServiceStatus.ACTIVE,
+      criticality: CriticalityLevel.CRITICAL,
+      uptime: 99.97,
+      responseTime: 95,
+      errorRate: 0.08,
+      tags: ['payments', 'core', 'subject-system'],
+      metadata: { language: 'Java', framework: 'Spring Boot' }
+    };
+
+    const hpNonStopItp: Service = {
+      id: 'itp',
+      name: 'HP NonStop ITP',
+      type: ServiceType.EXTERNAL_SERVICE,
+      description: 'Transaction processing on HP NonStop ITP',
+      environment: 'production',
+      team: 'Mainframe Ops',
+      owner: 'Mainframe Team',
+      version: 'v1',
+      lastSeen: new Date(),
+      status: ServiceStatus.ACTIVE,
+      criticality: CriticalityLevel.CRITICAL,
+      uptime: 99.99,
+      responseTime: 40,
+      errorRate: 0.02,
+      tags: ['nonstop', 'itp', 'transaction'],
+      metadata: { protocol: 'TCP', port: 1025 }
+    };
+
+    // Databases (multiple)
+    const oracleCore: Service = {
+      id: 'db-oracle',
+      name: 'Core Banking DB (Oracle)',
+      type: ServiceType.DATABASE,
+      description: 'Oracle database for core banking',
+      environment: 'production',
+      team: 'DBA',
+      owner: 'Data Platform',
+      version: '19c',
+      lastSeen: new Date(),
+      status: ServiceStatus.ACTIVE,
+      criticality: CriticalityLevel.CRITICAL,
+      uptime: 99.95,
+      responseTime: 7,
+      errorRate: 0.03,
+      tags: ['oracle', 'core-banking'],
+      metadata: { engine: 'Oracle', host: 'oracle-core.company.com' }
+    };
+
+    const postgresCustomer: Service = {
+      id: 'db-pg',
+      name: 'Customer DB (PostgreSQL)',
+      type: ServiceType.DATABASE,
+      description: 'Customer data store',
+      environment: 'production',
+      team: 'DBA',
+      owner: 'Customer Data',
+      version: '14',
+      lastSeen: new Date(),
+      status: ServiceStatus.ACTIVE,
+      criticality: CriticalityLevel.HIGH,
+      uptime: 99.9,
+      responseTime: 6,
+      errorRate: 0.02,
+      tags: ['postgresql', 'customers'],
+      metadata: { engine: 'PostgreSQL', host: 'pg-customers.company.com' }
+    };
+
+    const db2Ledger: Service = {
+      id: 'db-db2',
+      name: 'Ledger DB (DB2)',
+      type: ServiceType.DATABASE,
+      description: 'Financial ledger',
+      environment: 'production',
+      team: 'Finance IT',
+      owner: 'Finance',
+      version: '11.5',
+      lastSeen: new Date(),
+      status: ServiceStatus.ACTIVE,
+      criticality: CriticalityLevel.CRITICAL,
+      uptime: 99.9,
+      responseTime: 9,
+      errorRate: 0.05,
+      tags: ['db2', 'ledger'],
+      metadata: { engine: 'DB2', host: 'db2-ledger.company.com' }
+    };
+
+    // Messaging
+    const ibmMq: Service = {
+      id: 'mq-ibm',
+      name: 'Payments MQ (IBM MQ)',
+      type: ServiceType.QUEUE,
+      description: 'Synchronous/async payments queue',
+      environment: 'production',
+      team: 'Messaging',
+      owner: 'Middleware',
+      version: '9.3',
+      lastSeen: new Date(),
+      status: ServiceStatus.ACTIVE,
+      criticality: CriticalityLevel.HIGH,
+      uptime: 99.99,
+      responseTime: 3,
+      errorRate: 0.01,
+      tags: ['ibm-mq', 'payments'],
+      metadata: { queueManager: 'QM1', channel: 'SYSTEM.DEF.SVRCONN' }
+    };
+
+    const kafkaBroker: Service = {
+      id: 'mq-kafka',
+      name: 'Events Kafka',
+      type: ServiceType.MESSAGE_BROKER,
+      description: 'Event streaming for notifications & audit',
+      environment: 'production',
+      team: 'Messaging',
+      owner: 'Data Streaming',
+      version: '3.6',
+      lastSeen: new Date(),
+      status: ServiceStatus.ACTIVE,
+      criticality: CriticalityLevel.MEDIUM,
+      uptime: 99.9,
+      responseTime: 4,
+      errorRate: 0.02,
+      tags: ['kafka', 'events'],
+      metadata: { cluster: 'kafka-prod', topics: ['payments.events', 'notifications.events'] }
+    };
+
     const sampleServices: Service[] = [
-      {
-        id: '1',
-        name: 'User Service',
-        type: 'JAVA_APP' as any,
-        description: 'Handles user authentication and profile management',
-        url: 'https://user-service.company.com',
-        port: 8080,
-        environment: 'production',
-        team: 'Platform Team',
-        owner: 'John Doe',
-        version: '2.1.0',
-        lastSeen: new Date(),
-        status: 'ACTIVE' as any,
-        criticality: 'HIGH' as any,
-        uptime: 99.9,
-        responseTime: 120,
-        errorRate: 0.1,
-        tags: ['authentication', 'user-management'],
-        metadata: { version: '2.1.0', framework: 'Spring Boot' }
-      },
-      {
-        id: '2',
-        name: 'Order Service',
-        type: 'DOTNET_APP' as any,
-        description: 'Manages order processing and fulfillment',
-        url: 'https://order-service.company.com',
-        port: 5000,
-        environment: 'production',
-        team: 'E-commerce Team',
-        owner: 'Jane Smith',
-        version: '1.5.2',
-        lastSeen: new Date(),
-        status: 'ACTIVE' as any,
-        criticality: 'CRITICAL' as any,
-        uptime: 99.95,
-        responseTime: 85,
-        errorRate: 0.05,
-        tags: ['orders', 'e-commerce'],
-        metadata: { version: '1.5.2', framework: '.NET Core' }
-      },
-      {
-        id: '3',
-        name: 'Payment Gateway',
-        type: 'EXTERNAL_SERVICE' as any,
-        description: 'Third-party payment processing service',
-        url: 'https://api.stripe.com',
-        environment: 'production',
-        team: 'External',
-        owner: 'Stripe Inc.',
-        version: '2020-08-27',
-        lastSeen: new Date(),
-        status: 'ACTIVE' as any,
-        criticality: 'CRITICAL' as any,
-        uptime: 99.99,
-        responseTime: 200,
-        errorRate: 0.01,
-        tags: ['payment', 'external'],
-        metadata: { provider: 'Stripe', version: '2020-08-27' }
-      },
-      {
-        id: '4',
-        name: 'User Database',
-        type: 'DATABASE' as any,
-        description: 'PostgreSQL database for user data',
-        url: 'user-db.company.com',
-        port: 5432,
-        environment: 'production',
-        team: 'Platform Team',
-        owner: 'Database Team',
-        version: '13.4',
-        lastSeen: new Date(),
-        status: 'ACTIVE' as any,
-        criticality: 'HIGH' as any,
-        uptime: 99.8,
-        responseTime: 5,
-        errorRate: 0.02,
-        tags: ['database', 'postgresql'],
-        metadata: { engine: 'PostgreSQL', version: '13.4' }
-      }
+      subjectSystem,
+      hpNonStopItp,
+      oracleCore,
+      postgresCustomer,
+      db2Ledger,
+      ibmMq,
+      kafkaBroker
     ];
 
     const sampleDependencies: Dependency[] = [
+      // Subject system interactions
       {
-        id: 'dep1',
-        sourceServiceId: '2',
-        targetServiceId: '1',
-        dependencyType: 'HTTP_REQUEST' as any,
-        usageCount: 1250,
+        id: 'dep-itp',
+        sourceServiceId: 'sys',
+        targetServiceId: 'itp',
+        dependencyType: DependencyType.API_CALL,
+        usageCount: 25000,
         lastUsed: new Date(),
-        description: 'Order service calls user service for customer validation',
-        isActive: true,
-        weight: 8,
-        frequency: 'HIGH' as any,
-        isCritical: true,
-        failureImpact: 'HIGH' as any,
-        latency: 150,
-        errorRate: 0.5,
-        metadata: { endpoint: '/api/users/validate', method: 'POST' }
-      },
-      {
-        id: 'dep2',
-        sourceServiceId: '2',
-        targetServiceId: '3',
-        dependencyType: 'API_CALL' as any,
-        usageCount: 890,
-        lastUsed: new Date(),
-        description: 'Order service processes payments via Stripe',
-        isActive: true,
-        weight: 10,
-        frequency: 'HIGH' as any,
-        isCritical: true,
-        failureImpact: 'HIGH' as any,
-        latency: 200,
-        errorRate: 0.1,
-        metadata: { endpoint: '/v1/charges', method: 'POST' }
-      },
-      {
-        id: 'dep3',
-        sourceServiceId: '1',
-        targetServiceId: '4',
-        dependencyType: 'DATABASE_QUERY' as any,
-        usageCount: 5000,
-        lastUsed: new Date(),
-        description: 'User service queries user database',
+        description: 'Submit and inquire transactions on HP NonStop ITP',
         isActive: true,
         weight: 9,
-        frequency: 'HIGH' as any,
+        frequency: 'HIGH',
         isCritical: true,
-        failureImpact: 'HIGH' as any,
-        latency: 5,
+        failureImpact: 'HIGH',
+        latency: 40,
+        errorRate: 0.08,
+        metadata: { protocol: 'TCP', operation: 'TRANSACTION', endpoint: 'itp:1025' }
+      },
+      {
+        id: 'dep-oracle',
+        sourceServiceId: 'sys',
+        targetServiceId: 'db-oracle',
+        dependencyType: DependencyType.DATABASE_QUERY,
+        usageCount: 120000,
+        lastUsed: new Date(),
+        description: 'Core account writes & reads',
+        isActive: true,
+        weight: 10,
+        frequency: 'HIGH',
+        isCritical: true,
+        failureImpact: 'HIGH',
+        latency: 7,
+        errorRate: 0.03,
+        metadata: { schema: 'CORE', operation: 'SELECT/UPDATE' }
+      },
+      {
+        id: 'dep-pg',
+        sourceServiceId: 'sys',
+        targetServiceId: 'db-pg',
+        dependencyType: DependencyType.DATABASE_QUERY,
+        usageCount: 65000,
+        lastUsed: new Date(),
+        description: 'Customer profile reads',
+        isActive: true,
+        weight: 7,
+        frequency: 'HIGH',
+        isCritical: true,
+        failureImpact: 'MEDIUM',
+        latency: 6,
         errorRate: 0.02,
-        metadata: { table: 'users', operation: 'SELECT' }
+        metadata: { schema: 'customers', operation: 'SELECT' }
+      },
+      {
+        id: 'dep-db2',
+        sourceServiceId: 'sys',
+        targetServiceId: 'db-db2',
+        dependencyType: DependencyType.DATABASE_QUERY,
+        usageCount: 42000,
+        lastUsed: new Date(),
+        description: 'Ledger postings',
+        isActive: true,
+        weight: 8,
+        frequency: 'HIGH',
+        isCritical: true,
+        failureImpact: 'HIGH',
+        latency: 9,
+        errorRate: 0.05,
+        metadata: { schema: 'ledger', operation: 'INSERT' }
+      },
+      {
+        id: 'dep-mq',
+        sourceServiceId: 'sys',
+        targetServiceId: 'mq-ibm',
+        dependencyType: DependencyType.MESSAGE_QUEUE,
+        usageCount: 90000,
+        lastUsed: new Date(),
+        description: 'Enqueue payment instructions and status updates',
+        isActive: true,
+        weight: 8,
+        frequency: 'HIGH',
+        isCritical: true,
+        failureImpact: 'MEDIUM',
+        latency: 12,
+        errorRate: 0.02,
+        metadata: { queue: 'PAYMENTS.IN', dlq: 'DLQ.PAYMENTS' }
+      },
+      {
+        id: 'dep-kafka',
+        sourceServiceId: 'sys',
+        targetServiceId: 'mq-kafka',
+        dependencyType: DependencyType.EVENT_STREAM,
+        usageCount: 30000,
+        lastUsed: new Date(),
+        description: 'Publish payment event notifications',
+        isActive: true,
+        weight: 6,
+        frequency: 'MEDIUM',
+        isCritical: false,
+        failureImpact: 'LOW',
+        latency: 8,
+        errorRate: 0.01,
+        metadata: { topic: 'payments.events', key: 'paymentId' }
       }
     ];
 
